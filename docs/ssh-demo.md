@@ -64,7 +64,7 @@ Use JSON Lines (`-o json`), not `json-pretty` or `json-seq`. Do not pass unfilte
 
 ## Isolated Linux integration test
 
-The Linux CI job runs `sudo python3 scripts/live-ssh-test.py target/debug/chompedr`. It requires systemd and OpenSSH server on a disposable test host. The script creates its own temporary SSH keys/configuration and a transient service restricted to a random loopback port. Six public-key login attempts use a randomly generated nonexistent username; every login must be rejected. It reads that service's actual journal records and requires exactly one repeated-failure alert.
+The Linux CI job runs `sudo python3 scripts/live-ssh-test.py target/debug/chompedr`. It requires systemd and OpenSSH server on a disposable test host. The script creates its own temporary SSH keys/configuration and a transient service restricted to a random loopback port. Six password login attempts use a randomly generated nonexistent username; every login must be rejected. It reads that service's actual journal records and requires exactly one repeated-failure alert.
 
 The transient service has a 60-second runtime limit and is stopped in cleanup. The script never modifies the host SSH service or creates users. This test verifies a real OpenSSH/journald pipeline; it does not establish detection accuracy across distributions or production workloads. See the latest GitHub Actions run for the result.
 

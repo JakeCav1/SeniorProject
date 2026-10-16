@@ -41,17 +41,21 @@ def main():
         with socket.socket() as sock:
             sock.bind(("127.0.0.1", 0))
             port = sock.getsockname()[1]
-        for key in ("host", "client"):
-            run("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(folder / key))
+        run("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(folder / "host"))
+        askpass = folder / "askpass"
+        askpass.write_text("#!/bin/sh\nprintf '%s\\n' 'chomp-ci-invalid-password'\n")
+        askpass.chmod(0o700)
+        client_env = dict(os.environ, SSH_ASKPASS=str(askpass),
+                          SSH_ASKPASS_REQUIRE="force", DISPLAY=":0")
         config = folder / "sshd_config"
         config.write_text(f"""ListenAddress 127.0.0.1
 Port {port}
 HostKey {folder / 'host'}
 PidFile {folder / 'pid'}
 AuthorizedKeysFile none
-PasswordAuthentication no
+PasswordAuthentication yes
 KbdInteractiveAuthentication no
-PubkeyAuthentication yes
+PubkeyAuthentication no
 UsePAM no
 PermitRootLogin no
 AllowTcpForwarding no
@@ -74,11 +78,12 @@ LogLevel VERBOSE
             else:
                 raise RuntimeError("Loopback SSH server did not start")
             for _ in range(6):
-                result = run("ssh", "-F", "/dev/null", "-p", str(port), "-i", str(folder / "client"),
-                    "-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes", "-o", "IdentityAgent=none",
+                result = run("ssh", "-F", "/dev/null", "-p", str(port),
+                    "-o", "BatchMode=no", "-o", "NumberOfPasswordPrompts=1", "-o", "IdentityAgent=none",
                     "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
-                    "-o", "ConnectTimeout=3", "-o", "PreferredAuthentications=publickey",
-                    f"{username}@127.0.0.1", "true", check=False)
+                    "-o", "ConnectTimeout=3", "-o", "PreferredAuthentications=password",
+                    f"{username}@127.0.0.1", "true", check=False,
+                    env=client_env, stdin=subprocess.DEVNULL, start_new_session=True)
                 if result.returncode != 255 or "Permission denied" not in result.stderr:
                     raise RuntimeError(f"Expected rejected loopback login: {result.stderr}")
             raw = ""
@@ -86,7 +91,7 @@ LogLevel VERBOSE
                 run("journalctl", "--sync")
                 raw = run("journalctl", "-u", unit, "--no-pager", "-o", "json").stdout
                 records = [json.loads(line) for line in raw.splitlines() if line.strip()]
-                failures = [r for r in records if isinstance(r.get("MESSAGE"), str) and r["MESSAGE"].startswith("Failed publickey")]
+                failures = [r for r in records if isinstance(r.get("MESSAGE"), str) and r["MESSAGE"].startswith("Failed password")]
                 if len(failures) >= 5:
                     break
                 time.sleep(0.1)
