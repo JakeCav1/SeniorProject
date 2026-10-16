@@ -4,7 +4,7 @@ A lightweight Rust endpoint detection and response project for UNIX systems and 
 
 ## Project progress
 
-Last updated: **2026-10-16**. Current phase: **SSH log normalization and time-window detection**. Completed items below describe the current implementation, not a production-ready EDR.
+Last updated: **2026-10-16**. Current phase: **SSH detection and verified Linux journal ingestion**. Completed items below describe the current implementation, not a production-ready EDR.
 
 ### Completed
 
@@ -28,21 +28,23 @@ Last updated: **2026-10-16**. Current phase: **SSH log normalization and time-wi
 | Check | Latest result | Evidence / remaining work |
 | --- | --- | --- |
 | Windows build | Passed locally | Rust stable 1.98.1 |
-| Automated tests | 39 passed locally | 11 engine, 14 CLI, 9 SSH/correlation, and 5 journal tests |
+| Automated tests | 39 passed on Windows, Linux, and macOS | 11 engine, 14 CLI, 9 SSH/correlation, and 5 journal tests |
 | Formatting | Passed locally | `cargo fmt --all -- --check` |
 | Lint | Passed locally | `cargo clippy --locked --all-targets -- -D warnings` |
 | Sample scan | Passed locally | Three events produce two alerts |
-| Linux and macOS | Initial version passed CI | New rule-management changes still need CI verification |
-| GitHub CI | Initial version passed | [Initial run](https://github.com/rmart1368/SeniorProject/actions/runs/35282569184); check the current change's run separately |
+| Linux and macOS | Passed current branch CI | Formatting, lint, and all 39 tests passed |
+| GitHub CI | All three platforms passed | [Verified run for 29f175a](https://github.com/rmart1368/SeniorProject/actions/runs/38957492982) |
+| Real Linux SSH integration | Passed on Ubuntu CI | Six rejected loopback logins produced journal records and exactly one grouped alert |
 
 ### Next work
 
 - [x] Confirm the initial GitHub CI matrix passes on all three platforms.
 - [x] Confirm merged rule-management changes pass the full CI matrix.
-- [ ] Confirm SSH detection branch passes the full CI matrix.
+- [x] Confirm SSH detection branch passes the full CI matrix.
 - [ ] Exercise interactive shell pipelines on Linux and macOS beyond automated stdin tests.
 - [x] Add normalization for ISO-dated OpenSSH authentication logs.
-- [ ] Verify live log collection on a Linux host and add broader log-format support.
+- [x] Verify actual SSH/journal ingestion on an isolated Linux CI host.
+- [ ] Validate the continuous journal pipeline, log rotation, and restart behavior on the target Linux distribution.
 - [ ] Build representative benign and malicious event fixtures; tune detection rules against both.
 - [ ] Expand the starter rules into a tested default rule set.
 - [x] Add bounded time-window thresholds grouped by event fields.
@@ -55,10 +57,10 @@ Dates below are the original pitch targets, not revised delivery commitments. Ow
 | Target | Deliverable | Owner(s) from pitch | Current status |
 | --- | --- | --- | --- |
 | 2026-10-01 | Skeleton code and project design | Team | Rust skeleton implemented; broader EDR architecture remains open |
-| 2026-10-22 | Configurable rule engine | Jake | Initial stateless engine implemented and tested locally |
-| 2026-10-22 | CLI compatibility | Raymon | Initial CLI passed all three CI platforms; rule-management extensions tested locally |
-| 2026-10-22 | Robust default rule set | Jake | Two demonstration rules only; validation and expansion pending |
-| 2026-11-01 | OS compatibility and quality-of-life improvements; optional UI start | Raymon (OS), Michael (UI) | Initial portable core passed CI; live UNIX collection and UI work pending |
+| 2026-10-22 | Configurable rule engine | Jake | Stateless matching and grouped time-window thresholds implemented; all three CI platforms pass |
+| 2026-10-22 | CLI compatibility | Raymon | Interactive prompt, rule management, and SSH/journal input pass all three CI platforms |
+| 2026-10-22 | Robust default rule set | Jake | Two starter rules and two SSH rules; representative-data tuning and expansion pending |
+| 2026-11-01 | OS compatibility and quality-of-life improvements; optional UI start | Raymon (OS), Michael (UI) | Portable core and Ubuntu SSH/journal integration verified; deployment and optional GUI pending |
 | 2026-11-12 | Finalized product | Team | Pending collection, detection coverage, response implementation, and end-to-end validation |
 
 Later backlog from the pitch: host-client orchestration and CLI rule editing (Daniel); optional UI, browser dashboard, and web server (Michael).
@@ -74,7 +76,7 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 | 2026-10-01 | Added the chompedr launcher with a gator welcome screen and preserved the chomp alias; installed the Windows release on the local user PATH | 22 tests, lint, release build, and installed launcher passed locally |
 | 2026-10-01 | Added a persistent command prompt with help, exit/quit, quoted paths, and recovery after command errors | All 25 tests, Clippy, and release build passed on Windows |
 | 2026-10-16 | Added OpenSSH log normalization, grouped time-window thresholds, two SSH rules, and an end-to-end demo | 34 tests and Clippy pass locally; current branch CI pending |
-| 2026-10-16 | Added journal JSON ingestion and an isolated real-SSH Linux CI check | 39 tests and lint pass locally; new CI run pending |
+| 2026-10-16 | Added journal JSON ingestion and an isolated real-SSH Linux CI check | 39 tests, formatting, and lint pass on all three CI platforms; six actual rejected SSH logins produce one alert on Ubuntu ([run](https://github.com/rmart1368/SeniorProject/actions/runs/38957492982)) |
 
 When updating this tracker, change the date, check off only completed work, record the platform and result of verification, and append a dated progress entry. Keep configured checks marked pending until they actually run.
 
