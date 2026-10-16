@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Lightweight, configurable event detection for Chomp EDR"
 publish = false
+default-run = "chompedr"
 
 [lib]
 name = "chomp_edr"
@@ -11,6 +12,10 @@ name = "chomp_edr"
 [[bin]]
 name = "chomp"
 path = "src/main.rs"
+
+[[bin]]
+name = "chompedr"
+path = "src/bin/chompedr.rs"
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }

@@ -1,6 +1,107 @@
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
+fn session(commands: &str) -> Output {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_chompedr"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(commands.as_bytes())
+        .unwrap();
+    child.wait_with_output().unwrap()
+}
+
+#[test]
+fn interactive_session_runs_multiple_commands_and_exits() {
+    let output = session("help\nvalidate -r rules\nlist-rules -r rules\nscan -r rules -i examples/events.jsonl -f text --fail-on-alert\nexit\ninvalid-after-exit\n");
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let text = String::from_utf8(output.stdout).unwrap();
+    assert!(text.contains("Valid: 2 rule(s)"));
+    assert!(text.contains("Sensitive account file modified"));
+    assert!(text.contains("status 1"));
+    assert!(text.contains("Goodbye."));
+    assert_eq!(text.matches("Team Chomp EDR").count(), 1);
+}
+
+#[test]
+fn interactive_session_recovers_from_invalid_commands_and_stdin_scans() {
+    let output = session("\nunknown\nscan -r rules\nscan -r rules -i -\nvalidate -r missing.yaml\nvalidate -r \"unfinished\nvalidate -r rules\nquit\n");
+    assert!(output.status.success());
+    let errors = String::from_utf8(output.stderr).unwrap();
+    assert!(errors.contains("unrecognized subcommand"));
+    assert!(errors.contains("interactive scans require -i FILE"));
+    assert!(errors.contains("unclosed quote"));
+    assert!(String::from_utf8(output.stdout)
+        .unwrap()
+        .contains("Valid: 2 rule(s)"));
+}
+
+#[test]
+fn interactive_session_supports_quoted_paths_and_eof() {
+    let fixture = Fixture::new();
+    let path = fixture.write("rules with spaces.yaml", &simple_rule("quoted"));
+    let output = session(&format!(
+        "validate -r \"{}\"\nvalidate -r '{}'\n",
+        path.display(),
+        path.display()
+    ));
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    assert_eq!(
+        String::from_utf8(output.stdout)
+            .unwrap()
+            .matches("Valid: 1 rule(s)")
+            .count(),
+        2
+    );
+}
+
+#[test]
+fn launcher_shows_banner_without_arguments_from_any_directory() {
+    for binary in [env!("CARGO_BIN_EXE_chompedr"), env!("CARGO_BIN_EXE_chomp")] {
+        let output = Command::new(binary)
+            .current_dir(std::env::temp_dir())
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        assert!(output.stderr.is_empty());
+        let text = String::from_utf8(output.stdout).unwrap();
+        assert!(text.contains("Team Chomp EDR"));
+        assert!(text.contains("00"));
+        assert!(text.contains("Commands:"));
+    }
+}
+
+#[test]
+fn launcher_keeps_scan_json_and_help_free_of_banner() {
+    let output = Command::new(env!("CARGO_BIN_EXE_chompedr"))
+        .args(["scan", "-r", "rules", "-i", "examples/events.jsonl"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    let alerts: Vec<serde_json::Value> = text
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(alerts.len(), 2);
+    for arg in ["--help", "--version"] {
+        let output = Command::new(env!("CARGO_BIN_EXE_chompedr"))
+            .arg(arg)
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        assert!(!String::from_utf8(output.stdout).unwrap().contains("00"));
+    }
+}
+
 fn scan(input: &str, extra: &[&str]) -> Output {
     let mut child = Command::new(env!("CARGO_BIN_EXE_chomp"))
         .args(["scan", "--rules", "rules/starter.yaml"])

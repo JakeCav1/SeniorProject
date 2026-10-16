@@ -4,7 +4,7 @@ A lightweight Rust endpoint detection and response project for UNIX systems and 
 
 ## Project progress
 
-Last updated: **2026-09-22**. Current phase: **rule tuning and CLI rule management**. Completed items below describe the current implementation, not a production-ready EDR.
+Last updated: **2026-10-01**. Current phase: **rule management and installed CLI launcher**. Completed items below describe the current implementation, not a production-ready EDR.
 
 ### Completed
 
@@ -16,7 +16,7 @@ Last updated: **2026-09-22**. Current phase: **rule tuning and CLI rule manageme
 - [x] Read JSON Lines from files or stdin and emit JSON or text alerts.
 - [x] Define script-friendly exit codes and bounded input handling.
 - [x] Include two demonstration rules and three sample events.
-- [x] Add 20 automated tests for the engine and CLI.
+- [x] Add 25 automated tests for the engine and CLI.
 - [x] Support rule exclusions (`none`) and optional case-insensitive matching.
 - [x] Load multiple rule files or folders and detect duplicate IDs across files.
 - [x] Select rules by ID for scans and list rule metadata as JSON Lines.
@@ -28,7 +28,7 @@ Last updated: **2026-09-22**. Current phase: **rule tuning and CLI rule manageme
 | Check | Latest result | Evidence / remaining work |
 | --- | --- | --- |
 | Windows build | Passed locally | Rust stable 1.98.1 |
-| Automated tests | 20 passed locally | 11 engine tests and 9 CLI tests |
+| Automated tests | 25 passed locally | 11 engine tests and 14 CLI tests |
 | Formatting | Passed locally | `cargo fmt --all -- --check` |
 | Lint | Passed locally | `cargo clippy --locked --all-targets -- -D warnings` |
 | Sample scan | Passed locally | Three events produce two alerts |
@@ -70,9 +70,24 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 | 2026-09-22 | Verified the initial GitHub CI run succeeded | Linux, macOS, and Windows matrix passed |
 | 2026-09-22 | Added exclusions, case-insensitive matching, multi-file/folder loading, exact rule selection, and JSON rule listing | All 20 tests and lint passed locally on Windows; current CI verification pending |
 
+| 2026-10-01 | Added the chompedr launcher with a gator welcome screen and preserved the chomp alias; installed the Windows release on the local user PATH | 22 tests, lint, release build, and installed launcher passed locally |
+
+| 2026-10-01 | Added a persistent command prompt with help, exit/quit, quoted paths, and recovery after command errors | All 25 tests, Clippy, and release build passed on Windows |
+
 When updating this tracker, change the date, check off only completed work, record the platform and result of verification, and append a dated progress entry. Keep configured checks marked pending until they actually run.
 
 ## Quick start
+
+The main command is now `chompedr`. Running it without arguments shows the Chomp EDR title, ASCII gator, version, and available commands, then stays in an interactive `chompedr>` prompt. Type commands without the executable name. Use `exit` or `quit` to return to the system shell; EOF also closes the session. It does not start a background monitor. The original `chomp` command remains available for compatibility.
+
+```sh
+chompedr
+chompedr scan -r rules -i examples/events.jsonl -f text
+```
+
+Inside the prompt, try `validate -r rules`, `list-rules -r rules`, or `scan -r rules -i examples/events.jsonl -f text`. `help` lists commands. Commands run one at a time and rules reload on each command. Failed commands report errors without closing the session. Quote paths containing spaces with single or double quotes; backslashes remain literal. Shell operators, variable expansion, and command execution are not supported. Interactive scans require `-i FILE`, because the prompt owns stdin; use the existing one-line scan command from the system shell for piped events. Each command line is limited to 8 KiB; exceeding that limit ends the session with an error.
+
+The banner appears only when no arguments are supplied. Scans, JSON output, `--help`, and `--version` remain free of the banner. Rule and event paths are relative to the current directory; the startup screen works from any directory.
 
 Install stable Rust with Cargo, then run these commands from the repository root:
 
@@ -86,10 +101,11 @@ cargo run -- scan --rules rules/starter.yaml --input examples/events.jsonl --for
 
 The sample has one benign event and two matching events. JSON output contains two alerts, one each for `CHOMP-001` and `CHOMP-002`.
 
-To install the `chomp` command locally:
+To install both `chompedr` and the compatible `chomp` command with Cargo (ensure Cargo's bin directory is on PATH):
 
 ```sh
 cargo install --path . --locked
+chompedr
 cat examples/events.jsonl | chomp scan -r rules/starter.yaml > alerts.jsonl
 ```
 
@@ -98,6 +114,8 @@ PowerShell piping also works:
 ```powershell
 Get-Content examples/events.jsonl | chomp scan -r rules/starter.yaml
 ```
+
+For the local Windows demo, the release executable can also be installed in `%LOCALAPPDATA%\ChompEDR\bin` and that directory added to the user's PATH. After a PATH change, restart existing terminal applications so they inherit the updated value. Rebuild and reinstall after source changes to update the installed executable.
 
 ## CLI contract
 
