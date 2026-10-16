@@ -20,8 +20,10 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Convert ISO-dated OpenSSH logs into normalized JSON Lines.
+    /// Convert OpenSSH text logs or journal JSON into normalized JSON Lines.
     NormalizeSsh {
+        #[arg(long, value_enum, default_value = "ssh")]
+        input_format: LogFormat,
         #[arg(short, long, default_value = "-")]
         input: PathBuf,
     },
@@ -74,9 +76,16 @@ enum Format {
 enum InputFormat {
     Json,
     Ssh,
+    Journal,
 }
 
-fn normalize_ssh(input: PathBuf) -> Result<u8, Box<dyn std::error::Error>> {
+#[derive(Clone, Copy, ValueEnum)]
+enum LogFormat {
+    Ssh,
+    Journal,
+}
+
+fn normalize_ssh(input: PathBuf, format: LogFormat) -> Result<u8, Box<dyn std::error::Error>> {
     let mut reader: Box<dyn BufRead> = if input.as_os_str() == "-" {
         Box::new(BufReader::new(io::stdin()))
     } else {
@@ -99,7 +108,14 @@ fn normalize_ssh(input: PathBuf) -> Result<u8, Box<dyn std::error::Error>> {
         if bytes > MAX_BYTES {
             return Err(format!("log line {number} exceeds 1 MiB").into());
         }
-        match chomp_edr::ssh::parse(&line).map_err(|e| format!("log line {number}: {e}"))? {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let parsed = match format {
+            LogFormat::Ssh => chomp_edr::ssh::parse(&line),
+            LogFormat::Journal => chomp_edr::ssh::parse_journal(&line),
+        };
+        match parsed.map_err(|e| format!("log line {number}: {e}"))? {
             Some(event) => {
                 serde_json::to_writer(&mut out, &event)?;
                 writeln!(out)?;
@@ -165,7 +181,10 @@ fn load(source: RuleSource) -> Result<Engine, Box<dyn std::error::Error>> {
 fn run(cli: Cli) -> Result<u8, Box<dyn std::error::Error>> {
     let mut out = io::BufWriter::new(io::stdout().lock());
     match cli.command {
-        Command::NormalizeSsh { input } => return normalize_ssh(input),
+        Command::NormalizeSsh {
+            input,
+            input_format,
+        } => return normalize_ssh(input, input_format),
         Command::Validate { source } => {
             let engine = load(source)?;
             writeln!(out, "Valid: {} rule(s)", engine.rules().count())?;
@@ -233,8 +252,11 @@ fn run(cli: Cli) -> Result<u8, Box<dyn std::error::Error>> {
                 let event: serde_json::Value = match input_format {
                     InputFormat::Json => serde_json::from_str(&line)
                         .map_err(|e| format!("event line {number}: {e}"))?,
-                    InputFormat::Ssh => match chomp_edr::ssh::parse(&line)
-                        .map_err(|e| format!("log line {number}: {e}"))?
+                    InputFormat::Ssh | InputFormat::Journal => match (match input_format {
+                        InputFormat::Journal => chomp_edr::ssh::parse_journal(&line),
+                        _ => chomp_edr::ssh::parse(&line),
+                    })
+                    .map_err(|e| format!("log line {number}: {e}"))?
                     {
                         Some(event) => event,
                         None => {
@@ -270,7 +292,7 @@ fn run(cli: Cli) -> Result<u8, Box<dyn std::error::Error>> {
                 out.flush()?;
             }
             out.flush()?;
-            if matches!(input_format, InputFormat::Ssh) {
+            if !matches!(input_format, InputFormat::Json) {
                 eprintln!("Skipped {skipped} unrelated log line(s).");
             }
             return Ok(u8::from(found && fail_on_alert));
@@ -394,7 +416,7 @@ fn interactive() -> Result<u8, Box<dyn std::error::Error>> {
         };
         // The session owns stdin. Letting scans consume it would interpret later
         // commands as events and can deadlock while the stdin lock is held.
-        if matches!(&cli.command, Command::Scan { input, .. } | Command::NormalizeSsh { input } if input.as_os_str() == "-")
+        if matches!(&cli.command, Command::Scan { input, .. } | Command::NormalizeSsh { input, .. } if input.as_os_str() == "-")
         {
             eprintln!("chompedr: interactive scans require -i FILE. For piped events, use chompedr scan from your system shell.");
             continue;

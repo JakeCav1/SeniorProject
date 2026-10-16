@@ -16,7 +16,7 @@ Last updated: **2026-10-16**. Current phase: **SSH log normalization and time-wi
 - [x] Read JSON Lines from files or stdin and emit JSON or text alerts.
 - [x] Define script-friendly exit codes and bounded input handling.
 - [x] Include two demonstration rules and three sample events.
-- [x] Add 34 automated tests for the engine, CLI, SSH adapter, and correlation.
+- [x] Add 39 automated tests for the engine, CLI, SSH adapter, and correlation.
 - [x] Support rule exclusions (`none`) and optional case-insensitive matching.
 - [x] Load multiple rule files or folders and detect duplicate IDs across files.
 - [x] Select rules by ID for scans and list rule metadata as JSON Lines.
@@ -28,7 +28,7 @@ Last updated: **2026-10-16**. Current phase: **SSH log normalization and time-wi
 | Check | Latest result | Evidence / remaining work |
 | --- | --- | --- |
 | Windows build | Passed locally | Rust stable 1.98.1 |
-| Automated tests | 34 passed locally | 11 engine, 14 CLI, and 9 SSH/correlation tests |
+| Automated tests | 39 passed locally | 11 engine, 14 CLI, 9 SSH/correlation, and 5 journal tests |
 | Formatting | Passed locally | `cargo fmt --all -- --check` |
 | Lint | Passed locally | `cargo clippy --locked --all-targets -- -D warnings` |
 | Sample scan | Passed locally | Three events produce two alerts |
@@ -74,8 +74,13 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 | 2026-10-01 | Added the chompedr launcher with a gator welcome screen and preserved the chomp alias; installed the Windows release on the local user PATH | 22 tests, lint, release build, and installed launcher passed locally |
 | 2026-10-01 | Added a persistent command prompt with help, exit/quit, quoted paths, and recovery after command errors | All 25 tests, Clippy, and release build passed on Windows |
 | 2026-10-16 | Added OpenSSH log normalization, grouped time-window thresholds, two SSH rules, and an end-to-end demo | 34 tests and Clippy pass locally; current branch CI pending |
+| 2026-10-16 | Added journal JSON ingestion and an isolated real-SSH Linux CI check | 39 tests and lint pass locally; new CI run pending |
 
 When updating this tracker, change the date, check off only completed work, record the platform and result of verification, and append a dated progress entry. Keep configured checks marked pending until they actually run.
+
+## Linux journal support
+
+Use `scan --input-format journal` or `normalize-ssh --input-format journal` with JSON Lines from `journalctl`. The [SSH walkthrough](docs/ssh-demo.md) includes the live pipeline command and the isolated Linux integration test. The journal adapter uses process metadata to identify SSH records; automatic service installation remains out of scope.
 
 ## SSH detection
 

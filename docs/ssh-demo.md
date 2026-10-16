@@ -37,7 +37,36 @@ tail -n 0 -F /path/to/iso-dated-auth.log | chompedr scan -r rules/ssh.yaml --inp
 
 Run this pipeline in the system shell, not the interactive Chomp prompt. Use an account that already has permission to read the log. `tail` is the external collector; Chomp does not configure logging, install a service, manage rotation, or maintain state across restarts. This command is an integration example, not evidence of a live-host test.
 
-Yearless traditional syslog (`Oct 16 12:00:00 ...`) and journal JSON are not supported in this iteration. Target authentication records with unsupported headers/methods or invalid fields stop the command with a line-numbered error. Unrelated lines are skipped; their count is reported on stderr at EOF. Blank scan lines are ignored. No live `journalctl` adapter is included yet.
+Yearless traditional syslog (`Oct 16 12:00:00 ...`) is not supported. Target authentication records with unsupported headers/methods or invalid fields stop the command with a line-numbered error. Unrelated lines are skipped; their count is reported on stderr at EOF. Blank scan lines are ignored.
+
+## Linux journal input
+
+`--input-format journal` accepts one JSON object per line from `journalctl -o json`. It reads `MESSAGE`, `_COMM`, `_HOSTNAME`, `_PID`, and `__REALTIME_TIMESTAMP` (microseconds since the Unix epoch). Records from `sshd`, `sshd-session`, and `sshd-auth` are supported. Missing or non-string message fields in SSH records are errors; binary/array message values are not supported. Required timestamp, host, and PID fields are checked for target authentication messages.
+
+The adapter checks `_COMM`, not the user-supplied `SYSLOG_IDENTIFIER`. A record from another process merely labeling itself `sshd` is skipped. This relies on genuine journald metadata; an edited JSON file is not authenticated by Chomp.
+
+From a Linux system shell with permission to read the journal:
+
+```sh
+set -o pipefail
+journalctl --no-pager -o json -n 0 -f _COMM=sshd _COMM=sshd-session _COMM=sshd-auth | chompedr scan -r rules/ssh.yaml --input-format journal -f text
+```
+
+Repeated matches on the same journal field are alternatives. `-n 0 -f` starts with new records; remove those options and add an appropriate `--since` value for historical scanning. Run from the project folder or provide an absolute rule path. Chomp flushes alerts as it processes events. Stop the system-shell pipeline with Ctrl+C. This is an external journal pipeline, not a background service installed by Chomp. System clock corrections or combined logs can still cause the documented out-of-order timestamp error.
+
+To inspect normalized journal events separately:
+
+```sh
+journalctl --no-pager -o json _COMM=sshd _COMM=sshd-session _COMM=sshd-auth | chompedr normalize-ssh --input-format journal
+```
+
+Use JSON Lines (`-o json`), not `json-pretty` or `json-seq`. Do not pass unfiltered arbitrary binary journal records as normalized event input.
+
+## Isolated Linux integration test
+
+The Linux CI job runs `sudo python3 scripts/live-ssh-test.py target/debug/chompedr`. It requires systemd and OpenSSH server on a disposable test host. The script creates its own temporary SSH keys/configuration and a transient service restricted to a random loopback port. Six public-key login attempts use a randomly generated nonexistent username; every login must be rejected. It reads that service's actual journal records and requires exactly one repeated-failure alert.
+
+The transient service has a 60-second runtime limit and is stopped in cleanup. The script never modifies the host SSH service or creates users. This test verifies a real OpenSSH/journald pipeline; it does not establish detection accuracy across distributions or production workloads. See the latest GitHub Actions run for the result.
 
 ## Threshold rules
 
@@ -67,4 +96,4 @@ Tests cover normalization, invalid log formats, group isolation, boundary times,
 
 These are review heuristics, not proof of compromise. Legitimate password mistakes and authorized root access can trigger them. Use local policy and representative real logs to tune rules before enabling any future responses. Automated endpoint actions are not implemented.
 
-Implementation references: [OpenSSH authentication logging](https://github.com/openssh/openssh-portable/blob/master/auth.c) and [Chrono timestamp parsing](https://docs.rs/chrono/latest/chrono/struct.DateTime.html).
+Implementation references: [OpenSSH authentication logging](https://github.com/openssh/openssh-portable/blob/master/auth.c), [Chrono timestamp parsing](https://docs.rs/chrono/latest/chrono/struct.DateTime.html), [systemd journal fields](https://github.com/systemd/systemd/blob/main/man/systemd.journal-fields.xml), and [journal JSON format](https://github.com/systemd/systemd/blob/main/docs/JOURNAL_EXPORT_FORMATS.md).
