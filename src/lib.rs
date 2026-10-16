@@ -1,8 +1,10 @@
-//! Stateless detection over normalized JSON events. No endpoint actions are executed.
+//! Configurable detection over normalized JSON events. Use Session for thresholds.
 use regex::{Regex, RegexBuilder};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
+pub mod session;
+pub mod ssh;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -24,6 +26,16 @@ pub struct Rule {
     #[serde(default)]
     pub description: String,
     detection: Detection,
+    #[serde(default)]
+    pub threshold: Option<Threshold>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Threshold {
+    pub count: usize,
+    pub window_seconds: u32,
+    pub group_by: Vec<String>,
 }
 
 fn enabled() -> bool {
@@ -193,6 +205,18 @@ impl Engine {
         let mut ids = HashSet::new();
         let mut rules = Vec::new();
         for mut rule in file.rules {
+            if let Some(t) = &rule.threshold {
+                if !(2..=1000).contains(&t.count)
+                    || !(1..=86400).contains(&t.window_seconds)
+                    || t.group_by.is_empty()
+                    || t.group_by.len() > 8
+                    || t.group_by
+                        .iter()
+                        .any(|p| p.trim().is_empty() || p.split('.').any(str::is_empty))
+                {
+                    return Err(format!("rule {}: threshold requires count 2..1000, window_seconds 1..86400 and 1..8 valid group_by paths", rule.id));
+                }
+            }
             if rule.id.trim().is_empty() || rule.name.trim().is_empty() {
                 return Err("rule id and name must not be blank".into());
             }
@@ -259,8 +283,19 @@ impl Engine {
         Ok(())
     }
 
-    /// Emit all matching rules, in file order. Missing or mistyped fields never match.
+    /// Emit matching stateless rules in file order. Use Session for threshold rules.
     pub fn evaluate<'a>(&'a self, event: &'a Value) -> Vec<Alert<'a>> {
+        self.candidates(event)
+            .into_iter()
+            .filter(|a| {
+                self.rules
+                    .iter()
+                    .any(|r| r.metadata.id == a.rule_id && r.metadata.threshold.is_none())
+            })
+            .collect()
+    }
+
+    pub(crate) fn candidates<'a>(&'a self, event: &'a Value) -> Vec<Alert<'a>> {
         if !event.is_object() {
             return Vec::new();
         }

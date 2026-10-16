@@ -20,6 +20,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Convert ISO-dated OpenSSH logs into normalized JSON Lines.
+    NormalizeSsh {
+        #[arg(short, long, default_value = "-")]
+        input: PathBuf,
+    },
     /// Validate the YAML schema and compile every detection rule.
     Validate {
         #[command(flatten)]
@@ -34,6 +39,8 @@ enum Command {
     },
     /// Evaluate JSON Lines events from a file or stdin; emit matching alerts.
     Scan {
+        #[arg(long, value_enum, default_value = "json")]
+        input_format: InputFormat,
         #[command(flatten)]
         source: RuleSource,
         /// Select an exact rule ID; repeat to select multiple rules.
@@ -61,6 +68,48 @@ struct RuleSource {
 enum Format {
     Json,
     Text,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum InputFormat {
+    Json,
+    Ssh,
+}
+
+fn normalize_ssh(input: PathBuf) -> Result<u8, Box<dyn std::error::Error>> {
+    let mut reader: Box<dyn BufRead> = if input.as_os_str() == "-" {
+        Box::new(BufReader::new(io::stdin()))
+    } else {
+        Box::new(BufReader::new(File::open(input)?))
+    };
+    let mut out = io::BufWriter::new(io::stdout().lock());
+    let mut line = String::new();
+    let mut number = 0;
+    let mut skipped = 0;
+    loop {
+        line.clear();
+        let bytes = reader
+            .by_ref()
+            .take((MAX_BYTES + 1) as u64)
+            .read_line(&mut line)?;
+        if bytes == 0 {
+            break;
+        }
+        number += 1;
+        if bytes > MAX_BYTES {
+            return Err(format!("log line {number} exceeds 1 MiB").into());
+        }
+        match chomp_edr::ssh::parse(&line).map_err(|e| format!("log line {number}: {e}"))? {
+            Some(event) => {
+                serde_json::to_writer(&mut out, &event)?;
+                writeln!(out)?;
+                out.flush()?;
+            }
+            None => skipped += 1,
+        }
+    }
+    eprintln!("Skipped {skipped} unrelated log line(s).");
+    Ok(0)
 }
 
 fn load_file(path: PathBuf) -> Result<Engine, Box<dyn std::error::Error>> {
@@ -116,6 +165,7 @@ fn load(source: RuleSource) -> Result<Engine, Box<dyn std::error::Error>> {
 fn run(cli: Cli) -> Result<u8, Box<dyn std::error::Error>> {
     let mut out = io::BufWriter::new(io::stdout().lock());
     match cli.command {
+        Command::NormalizeSsh { input } => return normalize_ssh(input),
         Command::Validate { source } => {
             let engine = load(source)?;
             writeln!(out, "Valid: {} rule(s)", engine.rules().count())?;
@@ -145,6 +195,7 @@ fn run(cli: Cli) -> Result<u8, Box<dyn std::error::Error>> {
             }
         }
         Command::Scan {
+            input_format,
             source,
             rule_ids,
             input,
@@ -153,6 +204,8 @@ fn run(cli: Cli) -> Result<u8, Box<dyn std::error::Error>> {
         } => {
             let mut engine = load(source)?;
             engine.select(&rule_ids)?;
+            let mut session = chomp_edr::session::Session::new(engine);
+            let mut skipped = 0;
             let mut reader: Box<dyn BufRead> = if input.as_os_str() == "-" {
                 Box::new(BufReader::new(io::stdin()))
             } else {
@@ -177,12 +230,26 @@ fn run(cli: Cli) -> Result<u8, Box<dyn std::error::Error>> {
                 if line.trim().is_empty() {
                     continue;
                 }
-                let event: serde_json::Value =
-                    serde_json::from_str(&line).map_err(|e| format!("event line {number}: {e}"))?;
+                let event: serde_json::Value = match input_format {
+                    InputFormat::Json => serde_json::from_str(&line)
+                        .map_err(|e| format!("event line {number}: {e}"))?,
+                    InputFormat::Ssh => match chomp_edr::ssh::parse(&line)
+                        .map_err(|e| format!("log line {number}: {e}"))?
+                    {
+                        Some(event) => event,
+                        None => {
+                            skipped += 1;
+                            continue;
+                        }
+                    },
+                };
                 if !event.is_object() {
                     return Err(format!("event line {number}: expected JSON object").into());
                 }
-                for alert in engine.evaluate(&event) {
+                for alert in session
+                    .process(&event)
+                    .map_err(|e| format!("event line {number}: {e}"))?
+                {
                     found = true;
                     match format {
                         Format::Json => {
@@ -192,10 +259,10 @@ fn run(cli: Cli) -> Result<u8, Box<dyn std::error::Error>> {
                         // JSON quoting escapes untrusted control characters for terminal output.
                         Format::Text => writeln!(
                             out,
-                            "[{:?}] {} {} (line {})",
-                            alert.severity,
-                            serde_json::to_string(alert.rule_id)?,
-                            serde_json::to_string(alert.rule_name)?,
+                            "[{}] {} {} (line {})",
+                            alert["severity"].as_str().unwrap_or("unknown"),
+                            alert["rule_id"],
+                            alert["rule_name"],
                             number
                         )?,
                     }
@@ -203,6 +270,9 @@ fn run(cli: Cli) -> Result<u8, Box<dyn std::error::Error>> {
                 out.flush()?;
             }
             out.flush()?;
+            if matches!(input_format, InputFormat::Ssh) {
+                eprintln!("Skipped {skipped} unrelated log line(s).");
+            }
             return Ok(u8::from(found && fail_on_alert));
         }
     }
@@ -324,7 +394,8 @@ fn interactive() -> Result<u8, Box<dyn std::error::Error>> {
         };
         // The session owns stdin. Letting scans consume it would interpret later
         // commands as events and can deadlock while the stdin lock is held.
-        if matches!(&cli.command, Command::Scan { input, .. } if input.as_os_str() == "-") {
+        if matches!(&cli.command, Command::Scan { input, .. } | Command::NormalizeSsh { input } if input.as_os_str() == "-")
+        {
             eprintln!("chompedr: interactive scans require -i FILE. For piped events, use chompedr scan from your system shell.");
             continue;
         }

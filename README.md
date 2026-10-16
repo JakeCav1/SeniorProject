@@ -4,7 +4,7 @@ A lightweight Rust endpoint detection and response project for UNIX systems and 
 
 ## Project progress
 
-Last updated: **2026-10-01**. Current phase: **rule management and installed CLI launcher**. Completed items below describe the current implementation, not a production-ready EDR.
+Last updated: **2026-10-16**. Current phase: **SSH log normalization and time-window detection**. Completed items below describe the current implementation, not a production-ready EDR.
 
 ### Completed
 
@@ -16,7 +16,7 @@ Last updated: **2026-10-01**. Current phase: **rule management and installed CLI
 - [x] Read JSON Lines from files or stdin and emit JSON or text alerts.
 - [x] Define script-friendly exit codes and bounded input handling.
 - [x] Include two demonstration rules and three sample events.
-- [x] Add 25 automated tests for the engine and CLI.
+- [x] Add 34 automated tests for the engine, CLI, SSH adapter, and correlation.
 - [x] Support rule exclusions (`none`) and optional case-insensitive matching.
 - [x] Load multiple rule files or folders and detect duplicate IDs across files.
 - [x] Select rules by ID for scans and list rule metadata as JSON Lines.
@@ -28,7 +28,7 @@ Last updated: **2026-10-01**. Current phase: **rule management and installed CLI
 | Check | Latest result | Evidence / remaining work |
 | --- | --- | --- |
 | Windows build | Passed locally | Rust stable 1.98.1 |
-| Automated tests | 25 passed locally | 11 engine tests and 14 CLI tests |
+| Automated tests | 34 passed locally | 11 engine, 14 CLI, and 9 SSH/correlation tests |
 | Formatting | Passed locally | `cargo fmt --all -- --check` |
 | Lint | Passed locally | `cargo clippy --locked --all-targets -- -D warnings` |
 | Sample scan | Passed locally | Three events produce two alerts |
@@ -38,12 +38,14 @@ Last updated: **2026-10-01**. Current phase: **rule management and installed CLI
 ### Next work
 
 - [x] Confirm the initial GitHub CI matrix passes on all three platforms.
-- [ ] Confirm new rule-management changes pass the full CI matrix.
+- [x] Confirm merged rule-management changes pass the full CI matrix.
+- [ ] Confirm SSH detection branch passes the full CI matrix.
 - [ ] Exercise interactive shell pipelines on Linux and macOS beyond automated stdin tests.
-- [ ] Add a Linux telemetry adapter that normalizes events for the engine.
+- [x] Add normalization for ISO-dated OpenSSH authentication logs.
+- [ ] Verify live log collection on a Linux host and add broader log-format support.
 - [ ] Build representative benign and malicious event fixtures; tune detection rules against both.
 - [ ] Expand the starter rules into a tested default rule set.
-- [ ] Add time-window correlation for repeated or related events.
+- [x] Add bounded time-window thresholds grouped by event fields.
 - [ ] Design explicit response policies and audit records before implementing endpoint actions.
 
 ### Pitch milestones
@@ -69,12 +71,17 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 | 2026-09-17 | Added this progress tracker with milestone status and remaining work | Documentation checked against the current implementation and recorded test results |
 | 2026-09-22 | Verified the initial GitHub CI run succeeded | Linux, macOS, and Windows matrix passed |
 | 2026-09-22 | Added exclusions, case-insensitive matching, multi-file/folder loading, exact rule selection, and JSON rule listing | All 20 tests and lint passed locally on Windows; current CI verification pending |
-
 | 2026-10-01 | Added the chompedr launcher with a gator welcome screen and preserved the chomp alias; installed the Windows release on the local user PATH | 22 tests, lint, release build, and installed launcher passed locally |
-
 | 2026-10-01 | Added a persistent command prompt with help, exit/quit, quoted paths, and recovery after command errors | All 25 tests, Clippy, and release build passed on Windows |
+| 2026-10-16 | Added OpenSSH log normalization, grouped time-window thresholds, two SSH rules, and an end-to-end demo | 34 tests and Clippy pass locally; current branch CI pending |
 
 When updating this tracker, change the date, check off only completed work, record the platform and result of verification, and append a dated progress entry. Keep configured checks marked pending until they actually run.
+
+## SSH detection
+
+Run `chompedr scan -r rules/ssh.yaml -i examples/ssh-demo.log --input-format ssh -f text` from the project folder. The demo emits two alerts. See [the SSH walkthrough](docs/ssh-demo.md) for supported log formats, normalization, threshold semantics, and Linux pipeline usage.
+
+Loading the entire `rules` directory now includes threshold rules and requires timestamps on JSON input. Use `-r rules/starter.yaml` to retain stateless scanning without timestamps.
 
 ## Quick start
 
@@ -191,13 +198,13 @@ Each rule needs a unique, nonblank `id`, a nonblank `name`, a severity (`low`, `
 
 Comparisons default to case-sensitive and require a nonempty string `value`; quote numeric-looking YAML values. Set `ignore_case: true` on a string comparison to use the regex engine's Unicode-aware case-insensitive matching. Literal comparisons still treat regex metacharacters literally. `exists` rejects `ignore_case: true`. Regex inline flags may override the rule-level setting within that pattern.
 
-Fields use dotted object paths (`process.executable`). Missing fields, nulls, and non-string values fail comparisons. No implicit conversion, array indexing, literal dotted keys, temporal correlation, or numeric comparison is supported yet. Regexes compile once when loading rules; lookaround and backreferences are not supported by the Rust regex engine. Existing version 1 rules keep their behavior when the new fields are omitted.
+Fields use dotted object paths (`process.executable`). Missing fields, nulls, and non-string values fail comparisons. No implicit conversion, array indexing, literal dotted keys, or numeric comparison is supported yet. Optional threshold rules support time-window correlation; see [SSH detection](docs/ssh-demo.md). Regexes compile once when loading rules; lookaround and backreferences are not supported by the Rust regex engine. Existing version 1 rules keep their behavior when the new fields are omitted.
 
 ## Architecture and scope
 
 `src/lib.rs` owns rule parsing, validation, compilation, and pure event evaluation. `src/main.rs` handles arguments, bounded streaming input, formatting, and exit codes. This boundary lets future UNIX collectors call the same engine without going through the CLI.
 
-This release scans supplied events. It does not collect live endpoint telemetry, correlate events across time, kill processes, isolate hosts, or execute rule-defined commands. The two starter rules demonstrate the schema and can flag legitimate activity; they are not a validated production detection set.
+This release scans supplied events or supported SSH log records and correlates threshold matches across event-time windows. External shell pipelines can supply appended log records. It does not install a live collector, kill processes, isolate hosts, or execute rule-defined commands. The starter and SSH rules demonstrate the schema and can flag legitimate activity; they are not a validated production detection set.
 
 The source uses portable Rust APIs. CI is configured for Linux, macOS, and Windows; actual compatibility should be confirmed by successful runs on each platform. UNIX-specific endpoint collection remains future work.
 
@@ -211,6 +218,6 @@ cargo test --locked
 
 Tests cover operators, missing/mistyped fields, all/any/none semantics, case-insensitive literals and regexes, disabled rules, invalid configuration, deterministic multi-rule alerts, cross-file duplicates, atomic ID selection, sorted directory loading, JSON rule listing, CLI file/stdin input, JSON output, error codes, CRLF, and event size limits. Dependencies are recorded in `Cargo.lock`.
 
-Next milestones: Linux telemetry adapter; representative benign/malicious event fixtures and tuned rules; time-window correlation; explicit response policy and audited response actions.
+Next milestones: live Linux verification and broader log support; tuning against representative real activity; explicit response policy and audited response actions.
 
 Dependency references: [Clap CLI derive documentation](https://docs.rs/clap/latest/clap/_derive/), [YAML parser](https://docs.rs/serde_yaml_ng/latest/serde_yaml_ng/), [Rust regex syntax](https://docs.rs/regex/latest/regex/#syntax).

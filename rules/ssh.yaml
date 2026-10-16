@@ -1,0 +1,33 @@
+version: 1
+rules:
+  - id: CHOMP-SSH-001
+    name: Repeated SSH authentication failures
+    description: Five failures from one source on one host within 60 seconds; investigate before responding.
+    severity: high
+    detection:
+      all:
+        - field: event.type
+          op: equals
+          value: ssh_auth
+        - field: event.outcome
+          op: equals
+          value: failure
+    threshold:
+      count: 5
+      window_seconds: 60
+      group_by: [host, source.ip]
+  - id: CHOMP-SSH-002
+    name: Successful SSH login as root
+    description: Review against local administrative policy; this may be authorized activity.
+    severity: medium
+    detection:
+      all:
+        - field: event.type
+          op: equals
+          value: ssh_auth
+        - field: event.outcome
+          op: equals
+          value: success
+        - field: user.name
+          op: equals
+          value: root
