@@ -1,7 +1,24 @@
 //! Bounded event-time correlation. Each scan creates a fresh session.
 use crate::{Engine, Result};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{HashMap, VecDeque};
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SavedSession {
+    groups: Vec<SavedGroup>,
+    last_time: Option<i64>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SavedGroup {
+    rule: String,
+    values: Vec<String>,
+    times: VecDeque<i64>,
+    expires: i64,
+}
 
 pub struct Session {
     engine: Engine,
@@ -10,6 +27,67 @@ pub struct Session {
 }
 
 impl Session {
+    pub(crate) fn save(&self) -> SavedSession {
+        SavedSession {
+            last_time: self.last_time,
+            groups: self
+                .groups
+                .iter()
+                .map(|((rule, values), (times, expires))| SavedGroup {
+                    rule: rule.clone(),
+                    values: values.clone(),
+                    times: times.clone(),
+                    expires: *expires,
+                })
+                .collect(),
+        }
+    }
+
+    pub(crate) fn restore(engine: Engine, saved: SavedSession) -> Result<Self> {
+        if saved.groups.len() > 4096 {
+            return Err("checkpoint has too many groups".into());
+        }
+        let mut session = Self::new(engine);
+        session.last_time = saved.last_time;
+        for g in saved.groups {
+            let t = session
+                .engine
+                .rules()
+                .find(|r| r.id == g.rule && r.enabled)
+                .and_then(|r| r.threshold.as_ref())
+                .ok_or("invalid checkpoint rule")?;
+            let now = saved
+                .last_time
+                .ok_or("checkpoint groups require a timestamp")?;
+            let window = i64::from(t.window_seconds) * 1000;
+            if g.values.len() != t.group_by.len()
+                || g.values.iter().any(|s| s.is_empty() || s.len() > 256)
+                || g.times.is_empty()
+                || g.times.len() > t.count
+                || g.times.iter().any(|v| *v > now)
+                || !g
+                    .times
+                    .iter()
+                    .zip(g.times.iter().skip(1))
+                    .all(|(a, b)| a <= b)
+                || g.times.back().and_then(|v| v.checked_add(window)) != Some(g.expires)
+                || g.expires < now
+                || g.times
+                    .front()
+                    .is_some_and(|v| g.times.back().unwrap().saturating_sub(*v) > window)
+            {
+                return Err("invalid checkpoint correlation group".into());
+            }
+            if session
+                .groups
+                .insert((g.rule, g.values), (g.times, g.expires))
+                .is_some()
+            {
+                return Err("duplicate checkpoint group".into());
+            }
+        }
+        Ok(session)
+    }
     pub fn new(engine: Engine) -> Self {
         Self {
             engine,

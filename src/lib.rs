@@ -3,6 +3,7 @@ use regex::{Regex, RegexBuilder};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
+pub mod checkpoint;
 pub mod session;
 pub mod ssh;
 
@@ -192,6 +193,31 @@ pub struct Alert<'a> {
 }
 
 impl Engine {
+    /// Exact compiled rule identity for versioned local checkpoints.
+    pub(crate) fn checkpoint_identity(&self) -> Value {
+        let conditions = |cs: &[CompiledCondition]| -> Vec<Value> {
+            cs.iter()
+                .map(|c| {
+                    serde_json::json!({"path": c.path,
+                "op": format!("{:?}", c.op), "value": c.value,
+                "regex": c.regex.as_ref().map(Regex::as_str)})
+                })
+                .collect()
+        };
+        Value::Array(
+            self.rules
+                .iter()
+                .map(|r| {
+                    let m = &r.metadata;
+                    serde_json::json!({"id": m.id, "name": m.name, "description": m.description,
+                "severity": m.severity, "enabled": m.enabled,
+                "all": conditions(&r.all), "any": conditions(&r.any), "none": conditions(&r.none),
+                "threshold": m.threshold.as_ref().map(|t| serde_json::json!({
+                    "count":t.count,"window_seconds":t.window_seconds,"group_by":t.group_by}))})
+                })
+                .collect(),
+        )
+    }
     /// Validate the entire rule set and compile regexes once, including disabled rules.
     pub fn from_yaml(source: &str) -> Result<Self> {
         let file: RuleFile =

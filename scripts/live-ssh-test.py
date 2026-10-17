@@ -130,8 +130,28 @@ LogLevel VERBOSE
                 raise RuntimeError(f"Expected exactly one threshold alert: {output.stdout} {output.stderr}")
             if alerts[0]["event"]["source"]["ip"] != "127.0.0.1":
                 raise RuntimeError("Alert did not originate from loopback")
+            # Restart between the fourth and fifth actual failure, preserving the window.
+            failures_seen = 0
+            prefix = []
+            for record in records:
+                prefix.append(json.dumps(record))
+                if str(record.get("MESSAGE", "")).startswith("Failed password"):
+                    failures_seen += 1
+                if failures_seen == 4:
+                    break
+            checkpoint_args = [str(binary), "scan", "-r", str(repo / "rules/ssh.yaml"),
+                               "--input-format", "journal", "--checkpoint", str(folder / "state")]
+            first = run(*checkpoint_args, input="\n".join(prefix) + "\n")
+            resumed = run(*checkpoint_args, input=raw)
+            repeated = run(*checkpoint_args, input=raw)
+            resumed_alerts = [json.loads(line) for line in resumed.stdout.splitlines()]
+            if first.stdout or repeated.stdout or len(resumed_alerts) != 1:
+                raise RuntimeError("Checkpoint restart lost the window or duplicated an alert")
+            if resumed_alerts[0]["rule_id"] != "CHOMP-SSH-001" or not resumed_alerts[0].get("alert_id"):
+                raise RuntimeError("Checkpoint alert missing expected identity")
             print(f"PASS: {len(failures)} real rejected SSH logins -> journal JSON -> one grouped alert")
             print("PASS: journal follow pipeline emitted an alert before EOF and remained running")
+            print("PASS: restart after four failures preserved the window; replay did not duplicate alerts")
         finally:
             if journal is not None:
                 journal.terminate()

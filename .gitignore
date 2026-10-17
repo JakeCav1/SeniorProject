@@ -1,3 +1,5 @@
 /target/
 *.log
 !examples/ssh-demo.log
+
+/.chomp-state/

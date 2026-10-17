@@ -16,7 +16,7 @@ Last updated: **2026-10-17**. Current phase: **SSH detection and verified Linux 
 - [x] Read JSON Lines from files or stdin and emit JSON or text alerts.
 - [x] Define script-friendly exit codes and bounded input handling.
 - [x] Include two demonstration rules and three sample events.
-- [x] Add 42 automated tests for the engine, CLI, SSH adapter, and correlation.
+- [x] Add 50 automated tests for the engine, CLI, SSH adapter, and correlation.
 - [x] Support rule exclusions (`none`) and optional case-insensitive matching.
 - [x] Load multiple rule files or folders and detect duplicate IDs across files.
 - [x] Select rules by ID for scans and list rule metadata as JSON Lines.
@@ -28,7 +28,7 @@ Last updated: **2026-10-17**. Current phase: **SSH detection and verified Linux 
 | Check | Latest result | Evidence / remaining work |
 | --- | --- | --- |
 | Windows build | Passed locally | Rust stable 1.98.1 |
-| Automated tests | 42 passed on Windows, Linux, and macOS | 11 engine, 14 CLI, 9 SSH/correlation, 5 journal, and 3 scenario suites (30 scenario/input combinations) |
+| Automated tests | 50 passed locally; checkpoint CI pending | 11 engine, 14 CLI, 9 SSH/correlation, 5 journal, and 3 scenario suites (30 scenario/input combinations), and 8 checkpoint tests |
 | Formatting | Passed locally | `cargo fmt --all -- --check` |
 | Lint | Passed locally | `cargo clippy --locked --all-targets -- -D warnings` |
 | Sample scan | Passed locally | Three events produce two alerts |
@@ -81,7 +81,13 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 
 | 2026-10-17 | Added ten labeled SSH scenarios and a continuous journal pipeline check | 42 tests, formatting, and lint pass on all three platforms; continuous Linux journal check passed ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39001952944)) |
 
+| 2026-10-17 | Added optional journal checkpoints with persisted windows, cursor replay, and retryable alert IDs | 50 tests pass locally; real-journal restart CI pending |
+
 When updating this tracker, change the date, check off only completed work, record the platform and result of verification, and append a dated progress entry. Keep configured checks marked pending until they actually run.
+
+## Restart recovery
+
+`scan --input-format journal --checkpoint DIRECTORY` saves detection windows and journal progress. Restart with input that includes the saved cursor. JSON alerts carry stable IDs for retry deduplication. See the [recovery guide](docs/ssh-demo.md#restart-recovery-journal-json-only) for commands and delivery limits.
 
 ## Linux journal support
 

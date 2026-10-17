@@ -56,6 +56,9 @@ enum Command {
         /// Return exit code 1 when at least one alert is emitted.
         #[arg(long)]
         fail_on_alert: bool,
+        /// Save journal progress and correlation in this directory; replay input through the saved cursor on restart.
+        #[arg(long)]
+        checkpoint: Option<PathBuf>,
     },
 }
 
@@ -220,9 +223,26 @@ fn run(cli: Cli) -> Result<u8, Box<dyn std::error::Error>> {
             input,
             format,
             fail_on_alert,
+            checkpoint,
         } => {
             let mut engine = load(source)?;
             engine.select(&rule_ids)?;
+            if let Some(path) = checkpoint {
+                if !matches!(input_format, InputFormat::Journal) || !matches!(format, Format::Json)
+                {
+                    return Err(
+                        "--checkpoint requires --input-format journal and JSON output".into(),
+                    );
+                }
+                let reader: Box<dyn BufRead> = if input.as_os_str() == "-" {
+                    Box::new(BufReader::new(io::stdin()))
+                } else {
+                    Box::new(BufReader::new(File::open(&input)?))
+                };
+                let found = chomp_edr::checkpoint::scan(engine, &path, reader, &mut out)
+                    .map_err(|e| format!("checkpoint scan: {e}"))?;
+                return Ok(u8::from(found && fail_on_alert));
+            }
             let mut session = chomp_edr::session::Session::new(engine);
             let mut skipped = 0;
             let mut reader: Box<dyn BufRead> = if input.as_os_str() == "-" {

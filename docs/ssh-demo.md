@@ -117,4 +117,31 @@ Implementation references: [OpenSSH authentication logging](https://github.com/o
 
 These fixtures lock down intended behavior; they do not measure production false-positive or false-negative rates. Before tuning thresholds, collect labeled samples from the intended deployment environment. Keep benign administration and legitimate retries in that evaluation set.
 
-The continuous CI check verifies alert delivery without closing input. Restart persistence, cursor recovery, journal rotation, and target-distribution deployment remain unverified. A new scan starts a fresh correlation window; restarting can therefore miss a burst split across sessions.
+The continuous CI check verifies alert delivery without closing input. Optional checkpoint recovery is described below. Journal rotation and target-distribution deployment remain unverified. Without a checkpoint, a new scan starts a fresh correlation window.
+
+## Restart recovery (journal JSON only)
+
+Use a dedicated local checkpoint directory with unchanged rules and the same journal source/filter. Every journal record must include `__CURSOR`. Checkpoint mode requires JSON output and adds `alert_id` (an encoded cursor/rule-ID pair).
+
+For a saved journal export that grows over time:
+
+```sh
+chompedr scan -r rules/ssh.yaml --input-format journal -i journal.jsonl --checkpoint .chomp-state
+```
+
+Rerun the same command after appending records. Chomp finds the saved cursor, skips the already processed prefix, and resumes with its saved threshold counters and suppression state. The export must retain the cursor record, even when earlier records are removed.
+
+For a Linux journal pipeline, use the same command on every start:
+
+```sh
+set -o pipefail
+journalctl --no-pager -o json --no-tail -f _COMM=sshd _COMM=sshd-session _COMM=sshd-auth | chompedr scan -r rules/ssh.yaml --input-format journal --checkpoint .chomp-state
+```
+
+`--no-tail` includes retained history even in follow mode ([systemd documentation](https://www.freedesktop.org/software/systemd/man/255/journalctl.html)). On the first run, historical events can generate alerts. Do not combine recovery with `-n 0`, `--after-cursor`, or a new filter that excludes the saved cursor. To check recovery against finite retained history, omit `-f`: a missing cursor returns status 2 without replacing the checkpoint. With an endless follow stream, Chomp keeps waiting for that cursor until EOF; it cannot infer a retention gap from silence. Archive loss requires an explicit decision to use a new checkpoint directory, which loses the old detection window.
+
+The checkpoint contains the journal position, correlation state, exact compiled rule identity, and any alerts awaiting output. Changing rules, rule selection, or schema version rejects the old checkpoint. One process may own a directory at a time; the OS releases its lock on exit. Keep the directory private and on a local filesystem; checkpoints are trusted application state and may contain event details. Do not edit its files or delete its lock file while running.
+
+The implementation writes and syncs a temporary snapshot before replacing the current snapshot. It commits pending alerts before writing stdout, then clears them after stdout flush succeeds. An interrupted delivery may repeat the same `alert_id`; consumers must deduplicate IDs if needed. A successful stdout flush does not prove a downstream consumer durably stored the alert. This is process-restart recovery, not an exactly-once delivery or power-loss guarantee. Checkpoint I/O/output failures return status 2, including broken pipes.
+
+Snapshots are limited to 64 MiB and rewritten for every record (twice for an alert). This first implementation prioritizes recovery correctness for modest log volumes; it has not been throughput-benchmarked. The existing 4,096-group limit and event-time ordering requirements still apply. `scan` without `--checkpoint` remains stateless across processes.
