@@ -79,16 +79,25 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 | 2026-10-01 | Added a persistent command prompt with help, exit/quit, quoted paths, and recovery after command errors | All 25 tests, Clippy, and release build passed on Windows |
 | 2026-10-16 | Added OpenSSH log normalization, grouped time-window thresholds, two SSH rules, and an end-to-end demo | 34 tests and Clippy pass locally; current branch CI pending |
 | 2026-10-16 | Added journal JSON ingestion and an isolated real-SSH Linux CI check | 39 tests, formatting, and lint pass on all three CI platforms; six actual rejected SSH logins produce one alert on Ubuntu ([run](https://github.com/rmart1368/SeniorProject/actions/runs/38957492982)) |
-
 | 2026-10-17 | Added ten labeled SSH scenarios and a continuous journal pipeline check | 42 tests, formatting, and lint pass on all three platforms; continuous Linux journal check passed ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39001952944)) |
-
 | 2026-10-17 | Added optional journal checkpoints with persisted windows, cursor replay, and retryable alert IDs | 50 tests, formatting, and lint passed on all three platforms; actual Linux journal replay preserved the window across restart without duplicating alerts ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39003922988)); Windows launcher updated |
-
 | 2026-10-17 | Added managed Linux monitoring with built-in SSH rules, default checkpoints, cursor availability checks, and collector cleanup | All three platforms passed; real Linux monitoring emitted alerts and stopped its collector on termination ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39051370331)); installed Windows launcher updated |
-
 | 2026-10-17 | Added read-only monitor status for saved progress, checkpoint ownership, and pending alerts | 57 Linux and 55 Windows/macOS tests passed; live Linux status check passed ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39051959097)); installed Windows command verified |
 
+| 2026-10-17 | Added a Linux user installer and optional disabled systemd user service | Installer syntax checked locally; Linux installation tests pending |
+
 When updating this tracker, change the date, check off only completed work, record the platform and result of verification, and append a dated progress entry. Keep configured checks marked pending until they actually run.
+
+## Linux installation
+
+Build on Linux and install into your user account:
+
+```sh
+cargo build --release --locked
+python3 scripts/install-linux.py
+```
+
+Add `$HOME/.local/bin` to your PATH if needed. Add `--service` to write an optional systemd user-service file; it remains disabled and stopped. See the [installation guide](docs/linux-install.md) for startup, upgrades, journal access, and removal.
 
 ## Live Linux monitoring
 
