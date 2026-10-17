@@ -28,12 +28,12 @@ Last updated: **2026-10-17**. Current phase: **SSH detection and verified Linux 
 | Check | Latest result | Evidence / remaining work |
 | --- | --- | --- |
 | Windows build | Passed locally | Rust stable 1.98.1 |
-| Automated tests | 50 passed locally; checkpoint CI pending | 11 engine, 14 CLI, 9 SSH/correlation, 5 journal, and 3 scenario suites (30 scenario/input combinations), and 8 checkpoint tests |
+| Automated tests | 50 passed on Windows, Linux, and macOS | 11 engine, 14 CLI, 9 SSH/correlation, 5 journal, and 3 scenario suites (30 scenario/input combinations), and 8 checkpoint tests |
 | Formatting | Passed locally | `cargo fmt --all -- --check` |
 | Lint | Passed locally | `cargo clippy --locked --all-targets -- -D warnings` |
 | Sample scan | Passed locally | Three events produce two alerts |
-| Linux and macOS | Passed current branch CI | Formatting, lint, and all 42 tests passed |
-| GitHub CI | All three platforms passed | [Verified run for 70ebabc](https://github.com/rmart1368/SeniorProject/actions/runs/39001952944) |
+| Linux and macOS | Passed current branch CI | Formatting, lint, and all 50 tests passed |
+| GitHub CI | All three platforms passed | [Verified run for f0be9b1](https://github.com/rmart1368/SeniorProject/actions/runs/39003922988) |
 | Real Linux SSH integration | Passed on Ubuntu CI | Six rejected loopback logins produced one grouped alert; continuous pipeline emitted before EOF |
 
 ### Next work
@@ -44,7 +44,8 @@ Last updated: **2026-10-17**. Current phase: **SSH detection and verified Linux 
 - [ ] Exercise interactive shell pipelines on Linux and macOS beyond automated stdin tests.
 - [x] Add normalization for ISO-dated OpenSSH authentication logs.
 - [x] Verify actual SSH/journal ingestion on an isolated Linux CI host.
-- [ ] Validate the continuous journal pipeline, log rotation, and restart behavior on the target Linux distribution.
+- [x] Verify continuous journal output and checkpoint restart using actual SSH records on Ubuntu CI.
+- [ ] Validate journal rotation, retention gaps, and deployment on the target Linux distribution.
 - [x] Add ten labeled synthetic SSH scenarios across all three input formats.
 - [ ] Collect representative target-host data and tune rules against benign and suspicious activity.
 - [ ] Expand the starter rules into a tested default rule set.
@@ -81,7 +82,7 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 
 | 2026-10-17 | Added ten labeled SSH scenarios and a continuous journal pipeline check | 42 tests, formatting, and lint pass on all three platforms; continuous Linux journal check passed ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39001952944)) |
 
-| 2026-10-17 | Added optional journal checkpoints with persisted windows, cursor replay, and retryable alert IDs | 50 tests pass locally; real-journal restart CI pending |
+| 2026-10-17 | Added optional journal checkpoints with persisted windows, cursor replay, and retryable alert IDs | 50 tests, formatting, and lint passed on all three platforms; actual Linux journal replay preserved the window across restart without duplicating alerts ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39003922988)); Windows launcher updated |
 
 When updating this tracker, change the date, check off only completed work, record the platform and result of verification, and append a dated progress entry. Keep configured checks marked pending until they actually run.
 
