@@ -28,13 +28,13 @@ Last updated: **2026-10-17**. Current phase: **SSH detection and verified Linux 
 | Check | Latest result | Evidence / remaining work |
 | --- | --- | --- |
 | Windows build | Passed locally | Rust stable 1.98.1 |
-| Automated tests | 42 passed locally; current CI pending | 11 engine, 14 CLI, 9 SSH/correlation, 5 journal, and 3 scenario suites (30 scenario/input combinations) |
+| Automated tests | 42 passed on Windows, Linux, and macOS | 11 engine, 14 CLI, 9 SSH/correlation, 5 journal, and 3 scenario suites (30 scenario/input combinations) |
 | Formatting | Passed locally | `cargo fmt --all -- --check` |
 | Lint | Passed locally | `cargo clippy --locked --all-targets -- -D warnings` |
 | Sample scan | Passed locally | Three events produce two alerts |
-| Linux and macOS | Passed current branch CI | Formatting, lint, and all 39 tests passed |
-| GitHub CI | All three platforms passed | [Verified run for 29f175a](https://github.com/rmart1368/SeniorProject/actions/runs/38957492982) |
-| Real Linux SSH integration | Passed on Ubuntu CI | Six rejected loopback logins produced journal records and exactly one grouped alert |
+| Linux and macOS | Passed current branch CI | Formatting, lint, and all 42 tests passed |
+| GitHub CI | All three platforms passed | [Verified run for 70ebabc](https://github.com/rmart1368/SeniorProject/actions/runs/39001952944) |
+| Real Linux SSH integration | Passed on Ubuntu CI | Six rejected loopback logins produced one grouped alert; continuous pipeline emitted before EOF |
 
 ### Next work
 
@@ -79,7 +79,7 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 | 2026-10-16 | Added OpenSSH log normalization, grouped time-window thresholds, two SSH rules, and an end-to-end demo | 34 tests and Clippy pass locally; current branch CI pending |
 | 2026-10-16 | Added journal JSON ingestion and an isolated real-SSH Linux CI check | 39 tests, formatting, and lint pass on all three CI platforms; six actual rejected SSH logins produce one alert on Ubuntu ([run](https://github.com/rmart1368/SeniorProject/actions/runs/38957492982)) |
 
-| 2026-10-17 | Added ten labeled SSH scenarios and a continuous journal pipeline check | 42 tests and lint pass locally; live-stream CI verification pending |
+| 2026-10-17 | Added ten labeled SSH scenarios and a continuous journal pipeline check | 42 tests, formatting, and lint pass on all three platforms; continuous Linux journal check passed ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39001952944)) |
 
 When updating this tracker, change the date, check off only completed work, record the platform and result of verification, and append a dated progress entry. Keep configured checks marked pending until they actually run.
 
