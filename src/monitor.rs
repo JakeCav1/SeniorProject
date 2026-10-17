@@ -4,6 +4,26 @@ use std::io::Write;
 use std::path::PathBuf;
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
+pub fn state_directory(dir: Option<PathBuf>) -> Result<PathBuf> {
+    let dir = match dir {
+        Some(dir) => dir,
+        None => {
+            #[cfg(target_os = "windows")]
+            let base = std::env::var_os("LOCALAPPDATA")
+                .map(|p| PathBuf::from(p).join("ChompEDR/state"))
+                .ok_or("set LOCALAPPDATA or provide --checkpoint DIRECTORY")?;
+            #[cfg(not(target_os = "windows"))]
+            let base = std::env::var_os("XDG_STATE_HOME")
+                .filter(|v| PathBuf::from(v).is_absolute())
+                .map(PathBuf::from)
+                .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/state")))
+                .ok_or("set HOME/XDG_STATE_HOME or provide --checkpoint DIRECTORY")?;
+            base.join("chomp-edr/ssh")
+        }
+    };
+    Ok(dir)
+}
+
 #[cfg(not(target_os = "linux"))]
 pub fn run(_: Engine, _: Option<PathBuf>, _: bool, _: impl Write) -> Result<()> {
     Err("live monitoring requires Linux with systemd journal access; use scan for exported logs on this platform".into())
@@ -92,19 +112,7 @@ mod linux {
     }
 
     pub fn run(engine: Engine, dir: Option<PathBuf>, once: bool, output: impl Write) -> Result<()> {
-        let dir = match dir {
-            Some(dir) => dir,
-            None => {
-                let base = std::env::var_os("XDG_STATE_HOME")
-                    .filter(|v| PathBuf::from(v).is_absolute())
-                    .map(PathBuf::from)
-                    .or_else(|| {
-                        std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/state"))
-                    })
-                    .ok_or("set HOME/XDG_STATE_HOME or provide --checkpoint DIRECTORY")?;
-                base.join("chomp-edr/ssh")
-            }
-        };
+        let dir = state_directory(dir)?;
         eprintln!("Chomp SSH monitor | checkpoint: {}", dir.display());
         crate::checkpoint::scan_from(
             engine,

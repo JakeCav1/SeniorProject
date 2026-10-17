@@ -225,3 +225,62 @@ fn checkpoint_cli_requires_journal_json_output_and_valid_cursor() {
         );
     }
 }
+
+#[test]
+fn status_is_read_only_for_absent_and_saved_progress() {
+    let dir = Temp::new();
+    let missing = dir.0.join("not-created");
+    let absent = checkpoint::status(engine(), &missing).unwrap();
+    assert_eq!(absent["saved_progress"], false);
+    assert!(!missing.exists());
+    scan(&dir, history(4));
+    let before = dir.bytes();
+    let state = checkpoint::status(engine(), &dir.0).unwrap();
+    assert_eq!(state["saved_progress"], true);
+    assert_eq!(state["in_use"], false);
+    assert_eq!(state["active_groups"], 1);
+    assert_eq!(state["pending_alerts"], 0);
+    assert_eq!(state["last_event_timestamp"], "2026-10-16T12:00:03+00:00");
+    assert_eq!(before, dir.bytes());
+    assert!(!state.to_string().contains("alice"));
+}
+
+#[test]
+fn status_reports_locked_checkpoint_and_pending_delivery() {
+    let dir = Temp::new();
+    let mut out = FailedFlush(Vec::new());
+    assert!(checkpoint::scan(engine(), &dir.0, Cursor::new(history(5)), &mut out).is_err());
+    let lock = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(dir.0.join("lock"))
+        .unwrap();
+    lock.try_lock().unwrap();
+    let state = checkpoint::status(engine(), &dir.0).unwrap();
+    assert_eq!(state["in_use"], true);
+    assert_eq!(state["pending_alerts"], 1);
+    assert_eq!(state["collector_health"], "not_checked");
+    drop(lock);
+    assert_eq!(scan(&dir, history(5)).len(), 1);
+}
+
+#[test]
+fn status_cli_works_without_collector_and_rejects_corrupt_state() {
+    let dir = Temp::new();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_chompedr"))
+        .args(["monitor", "--status", "--checkpoint"])
+        .arg(&dir.0)
+        .env("PATH", "")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let state: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(state["saved_progress"], false);
+    assert_eq!(std::fs::read_dir(&dir.0).unwrap().count(), 0);
+    std::fs::write(dir.0.join("snapshot.json"), "corrupt").unwrap();
+    assert!(checkpoint::status(engine(), &dir.0).is_err());
+}

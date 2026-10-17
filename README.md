@@ -86,6 +86,8 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 
 | 2026-10-17 | Added managed Linux monitoring with built-in SSH rules, default checkpoints, cursor availability checks, and collector cleanup | All three platforms passed; real Linux monitoring emitted alerts and stopped its collector on termination ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39051370331)); installed Windows launcher updated |
 
+| 2026-10-17 | Added read-only monitor status for saved progress, checkpoint ownership, and pending alerts | 55 Windows tests and lint pass locally; full CI pending |
+
 When updating this tracker, change the date, check off only completed work, record the platform and result of verification, and append a dated progress entry. Keep configured checks marked pending until they actually run.
 
 ## Live Linux monitoring
@@ -99,6 +101,14 @@ chompedr monitor
 This uses built-in SSH rules, includes the last 60 seconds on first start, then follows new records. Checkpoints default to `$XDG_STATE_HOME/chomp-edr/ssh` or `$HOME/.local/state/chomp-edr/ssh`. Stop with Ctrl+C and run the same command to resume. Alerts are JSON on stdout; lifecycle messages and collector diagnostics go to stderr.
 
 Use `monitor --once` to catch up and exit, `--checkpoint DIRECTORY` to choose state storage, or `-r FILE` to choose rules. This command must run in the system terminal, outside the interactive Chomp prompt. On Windows/macOS, use `scan` with exported logs. See the [monitor guide](docs/ssh-demo.md#managed-monitor-command) for limitations.
+
+### Check monitoring progress
+
+```sh
+chompedr monitor --status
+```
+
+Status reports checkpoint use, saved progress, queued alerts, and the last correlation timestamp as JSON. It does not start collection or alter progress. Use the same `--checkpoint` and `-r` options as your monitor. It is also available inside the interactive prompt as `monitor --status`. A checkpoint lock is not a collector-health guarantee.
 
 ## Restart recovery
 

@@ -131,6 +131,11 @@ LogLevel VERBOSE
             if not any(a["rule_id"] == "CHOMP-SSH-001" and a["event"]["source"]["ip"] == "127.0.0.1" for a in monitored_alerts):
                 raise RuntimeError("Managed monitor missed loopback SSH failures")
             print("PASS: monitor command collected real SSH journal records and emitted a live alert")
+            status = json.loads(run(str(binary), "monitor", "--status", "--checkpoint", str(folder / "monitor-state")).stdout)
+            if not status["in_use"] or not status["saved_progress"]:
+                raise RuntimeError("Status did not observe the running monitor checkpoint")
+            print("PASS: read-only status observed saved progress while monitoring remained active")
+
             raw = ""
             for _ in range(20):
                 run("journalctl", "--sync")

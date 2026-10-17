@@ -81,35 +81,7 @@ pub fn scan_from<R: BufRead>(
     lock.try_lock()
         .map_err(|e| format!("checkpoint is in use or cannot be locked: {e}"))?;
     let identity = engine.checkpoint_identity();
-    let mut saved = match File::open(dir.join("snapshot.json")) {
-        Ok(file) => {
-            let mut bytes = Vec::new();
-            file.take(MAX_STATE + 1).read_to_end(&mut bytes)?;
-            if bytes.len() as u64 > MAX_STATE {
-                return Err("checkpoint exceeds 64 MiB".into());
-            }
-            let state: Snapshot = serde_json::from_slice(&bytes)?;
-            if state.version != 1 || state.rules != identity {
-                return Err(
-                    "checkpoint version or rules changed; use a new checkpoint directory".into(),
-                );
-            }
-            if state.cursor.is_empty() || state.cursor.len() > 8192 {
-                return Err("invalid checkpoint cursor".into());
-            }
-            for alert in &state.pending {
-                let rule = alert["rule_id"].as_str().ok_or("invalid pending alert")?;
-                if !engine.rules().any(|r| r.id == rule)
-                    || alert["alert_id"] != serde_json::to_string(&(&state.cursor, rule))?
-                {
-                    return Err("invalid pending alert identity".into());
-                }
-            }
-            Some(state)
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
-        Err(e) => return Err(e.into()),
-    };
+    let mut saved = load(&engine, dir)?;
     let mut seeking = saved.as_ref().map(|s| s.cursor.clone());
     let mut pending = Vec::new();
     let mut session = if let Some(state) = saved.take() {
@@ -184,4 +156,75 @@ pub fn scan_from<R: BufRead>(
         return Err("saved journal cursor was not found; replay retained journal history through that cursor (do not use --after-cursor or -n 0); checkpoint unchanged".into());
     }
     Ok(found)
+}
+
+fn load(engine: &Engine, dir: &Path) -> Result<Option<Snapshot>> {
+    let saved = match File::open(dir.join("snapshot.json")) {
+        Ok(file) => {
+            let mut bytes = Vec::new();
+            file.take(MAX_STATE + 1).read_to_end(&mut bytes)?;
+            if bytes.len() as u64 > MAX_STATE {
+                return Err("checkpoint exceeds 64 MiB".into());
+            }
+            let state: Snapshot = serde_json::from_slice(&bytes)?;
+            if state.version != 1 || state.rules != engine.checkpoint_identity() {
+                return Err(
+                    "checkpoint version or rules changed; use a new checkpoint directory".into(),
+                );
+            }
+            if state.cursor.is_empty() || state.cursor.len() > 8192 {
+                return Err("invalid checkpoint cursor".into());
+            }
+            for alert in &state.pending {
+                let rule = alert["rule_id"].as_str().ok_or("invalid pending alert")?;
+                if !engine.rules().any(|r| r.id == rule)
+                    || alert["alert_id"] != serde_json::to_string(&(&state.cursor, rule))?
+                {
+                    return Err("invalid pending alert identity".into());
+                }
+            }
+            Some(state)
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => return Err(e.into()),
+    };
+    Ok(saved)
+}
+
+/// Read-only point-in-time status. Lock ownership is not a collector health check.
+pub fn status(engine: Engine, dir: &Path) -> Result<Value> {
+    let lock = match OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(dir.join("lock"))
+    {
+        Ok(lock) => Some(lock),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => return Err(e.into()),
+    };
+    let in_use = if let Some(lock) = &lock {
+        match lock.try_lock() {
+            Ok(()) => false,
+            Err(std::fs::TryLockError::WouldBlock) => true,
+            Err(e) => return Err(e.into()),
+        }
+    } else {
+        false
+    };
+    let Some(saved) = load(&engine, dir)? else {
+        return Ok(serde_json::json!({"checkpoint":dir, "in_use":in_use,
+            "saved_progress":false,"pending_alerts":0,"collector_health":"not_checked"}));
+    };
+    let summary = serde_json::to_value(&saved.session)?;
+    let last = summary["last_time"]
+        .as_i64()
+        .and_then(chrono::DateTime::from_timestamp_millis)
+        .map(|t| t.to_rfc3339());
+    let groups = summary["groups"].as_array().map_or(0, Vec::len);
+    Session::restore(engine, saved.session)?;
+    Ok(
+        serde_json::json!({"checkpoint":dir, "in_use":in_use,"saved_progress":true,
+        "pending_alerts":saved.pending.len(),"active_groups":groups,
+        "last_event_timestamp":last,"collector_health":"not_checked"}),
+    )
 }

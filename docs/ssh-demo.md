@@ -157,3 +157,11 @@ The first start includes only the last 60 seconds of accessible SSH records, the
 The collector is stopped on processing errors and when the monitor parent exits. An unexpected collector exit returns status 2; there is no automatic restart loop or background-service installation. Restart manually with the same directory. Invalid/changed rules, a locked checkpoint, and unavailable cursors fail without silently clearing saved state. Deduplicate stable alert IDs downstream as described above. Rule updates require an explicit new checkpoint decision.
 
 This release supports only Linux systemd journals for live collection. Windows and macOS receive an explanatory error and can still scan exported logs. Journal rotation under sustained load, service installation, throughput, and production detection accuracy remain deployment work.
+
+### Read-only status
+
+`chompedr monitor --status` prints a JSON snapshot without launching journalctl, creating a checkpoint directory, acknowledging alerts, or changing saved progress. It may briefly acquire an existing free lock while reading; if another process already owns it, `in_use` is true and status reads the last atomically saved snapshot. Lock and progress observations are point-in-time information, not a live health check; `collector_health` explicitly remains `not_checked`.
+
+Use the same custom rules and checkpoint directory as the monitor. Invalid state or changed rules returns status 2. A missing snapshot is reported as `saved_progress: false`, which can also mean a running collector has not received its first record. `active_groups` and `last_event_timestamp` reflect persisted event-time correlation, not wall-clock freshness; stateless-only rules may have no correlation timestamp. Pending counts describe committed alerts awaiting output acknowledgement. Raw event payloads and journal cursors are omitted.
+
+Unlike live collection, status works on all supported platforms and in the interactive Chomp prompt. On Windows, its default directory is `%LOCALAPPDATA%/ChompEDR/state/chomp-edr/ssh`; use `--checkpoint DIRECTORY` to inspect exported/copied state elsewhere. Status does not test whether the saved cursor is still retained by the Linux journal.

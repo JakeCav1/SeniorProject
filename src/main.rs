@@ -28,6 +28,9 @@ enum Command {
         /// Checkpoint directory; defaults to your user state directory.
         #[arg(long)]
         checkpoint: Option<PathBuf>,
+        /// Inspect saved progress without starting a collector (JSON output).
+        #[arg(long, conflicts_with = "once")]
+        status: bool,
         /// Process available records and exit instead of following new records.
         #[arg(long)]
         once: bool,
@@ -200,14 +203,22 @@ fn run(cli: Cli) -> Result<u8, Box<dyn std::error::Error>> {
             rules,
             checkpoint,
             once,
+            status,
         } => {
             let engine = if rules.is_empty() {
                 Engine::from_yaml(include_str!("../rules/ssh.yaml"))?
             } else {
                 load(RuleSource { rules })?
             };
-            chomp_edr::monitor::run(engine, checkpoint, once, &mut out)
-                .map_err(|e| format!("monitor: {e}"))?;
+            if status {
+                let dir = chomp_edr::monitor::state_directory(checkpoint)?;
+                let state = chomp_edr::checkpoint::status(engine, &dir)?;
+                serde_json::to_writer(&mut out, &state)?;
+                writeln!(out)?;
+            } else {
+                chomp_edr::monitor::run(engine, checkpoint, once, &mut out)
+                    .map_err(|e| format!("monitor: {e}"))?;
+            }
         }
         Command::NormalizeSsh {
             input,
@@ -459,7 +470,7 @@ fn interactive() -> Result<u8, Box<dyn std::error::Error>> {
                 continue;
             }
         };
-        if matches!(&cli.command, Command::Monitor { .. }) {
+        if matches!(&cli.command, Command::Monitor { status: false, .. }) {
             eprintln!("chompedr: run chompedr monitor from your system terminal so Ctrl+C can stop monitoring.");
             continue;
         }
