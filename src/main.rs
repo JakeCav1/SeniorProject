@@ -20,6 +20,18 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Monitor Linux SSH journal records with automatic checkpoint recovery.
+    Monitor {
+        /// YAML sources; omit to use the built-in SSH rules.
+        #[arg(short, long)]
+        rules: Vec<PathBuf>,
+        /// Checkpoint directory; defaults to your user state directory.
+        #[arg(long)]
+        checkpoint: Option<PathBuf>,
+        /// Process available records and exit instead of following new records.
+        #[arg(long)]
+        once: bool,
+    },
     /// Convert OpenSSH text logs or journal JSON into normalized JSON Lines.
     NormalizeSsh {
         #[arg(long, value_enum, default_value = "ssh")]
@@ -184,6 +196,19 @@ fn load(source: RuleSource) -> Result<Engine, Box<dyn std::error::Error>> {
 fn run(cli: Cli) -> Result<u8, Box<dyn std::error::Error>> {
     let mut out = io::BufWriter::new(io::stdout().lock());
     match cli.command {
+        Command::Monitor {
+            rules,
+            checkpoint,
+            once,
+        } => {
+            let engine = if rules.is_empty() {
+                Engine::from_yaml(include_str!("../rules/ssh.yaml"))?
+            } else {
+                load(RuleSource { rules })?
+            };
+            chomp_edr::monitor::run(engine, checkpoint, once, &mut out)
+                .map_err(|e| format!("monitor: {e}"))?;
+        }
         Command::NormalizeSsh {
             input,
             input_format,
@@ -434,6 +459,10 @@ fn interactive() -> Result<u8, Box<dyn std::error::Error>> {
                 continue;
             }
         };
+        if matches!(&cli.command, Command::Monitor { .. }) {
+            eprintln!("chompedr: run chompedr monitor from your system terminal so Ctrl+C can stop monitoring.");
+            continue;
+        }
         // The session owns stdin. Letting scans consume it would interpret later
         // commands as events and can deadlock while the stdin lock is held.
         if matches!(&cli.command, Command::Scan { input, .. } | Command::NormalizeSsh { input, .. } if input.as_os_str() == "-")

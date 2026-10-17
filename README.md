@@ -4,7 +4,7 @@ A lightweight Rust endpoint detection and response project for UNIX systems and 
 
 ## Project progress
 
-Last updated: **2026-10-17**. Current phase: **SSH detection and verified Linux journal ingestion**. Completed items below describe the current implementation, not a production-ready EDR.
+Last updated: **2026-10-17**. Current phase: **Managed Linux SSH monitoring and restart recovery**. Completed items below describe the current implementation, not a production-ready EDR.
 
 ### Completed
 
@@ -16,7 +16,7 @@ Last updated: **2026-10-17**. Current phase: **SSH detection and verified Linux 
 - [x] Read JSON Lines from files or stdin and emit JSON or text alerts.
 - [x] Define script-friendly exit codes and bounded input handling.
 - [x] Include two demonstration rules and three sample events.
-- [x] Add 50 automated tests for the engine, CLI, SSH adapter, and correlation.
+- [x] Test the engine, CLI, SSH adapters, correlation, checkpoint recovery, and monitor lifecycle.
 - [x] Support rule exclusions (`none`) and optional case-insensitive matching.
 - [x] Load multiple rule files or folders and detect duplicate IDs across files.
 - [x] Select rules by ID for scans and list rule metadata as JSON Lines.
@@ -84,7 +84,21 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 
 | 2026-10-17 | Added optional journal checkpoints with persisted windows, cursor replay, and retryable alert IDs | 50 tests, formatting, and lint passed on all three platforms; actual Linux journal replay preserved the window across restart without duplicating alerts ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39003922988)); Windows launcher updated |
 
+| 2026-10-17 | Added managed Linux monitoring with built-in SSH rules, default checkpoints, cursor availability checks, and collector cleanup | Windows monitor compatibility tests pass; Linux CI pending |
+
 When updating this tracker, change the date, check off only completed work, record the platform and result of verification, and append a dated progress entry. Keep configured checks marked pending until they actually run.
+
+## Live Linux monitoring
+
+On a Linux host with systemd journal access:
+
+```sh
+chompedr monitor
+```
+
+This uses built-in SSH rules, includes the last 60 seconds on first start, then follows new records. Checkpoints default to `$XDG_STATE_HOME/chomp-edr/ssh` or `$HOME/.local/state/chomp-edr/ssh`. Stop with Ctrl+C and run the same command to resume. Alerts are JSON on stdout; lifecycle messages and collector diagnostics go to stderr.
+
+Use `monitor --once` to catch up and exit, `--checkpoint DIRECTORY` to choose state storage, or `-r FILE` to choose rules. This command must run in the system terminal, outside the interactive Chomp prompt. On Windows/macOS, use `scan` with exported logs. See the [monitor guide](docs/ssh-demo.md#managed-monitor-command) for limitations.
 
 ## Restart recovery
 

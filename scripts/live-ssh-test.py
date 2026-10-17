@@ -65,9 +65,10 @@ LogLevel VERBOSE
 """)
         # Standard privilege-separation runtime directory; no host SSH config changes.
         Path("/run/sshd").mkdir(mode=0o755, exist_ok=True)
-        journal = scanner = None
+        journal = scanner = monitor = None
         live_output = (folder / "alerts.jsonl").open("w")
         live_errors = (folder / "scan-errors.txt").open("w")
+        monitor_output = (folder / "monitor.jsonl").open("w")
         try:
             run("systemd-run", "--unit", unit, "--property=RuntimeMaxSec=60",
                 "--property=StandardOutput=journal", "--property=StandardError=journal",
@@ -89,6 +90,10 @@ LogLevel VERBOSE
                  "--input-format", "journal"],
                 stdin=journal.stdout, stdout=live_output, stderr=live_errors)
             journal.stdout.close()
+            monitor = subprocess.Popen(
+                [str(binary), "monitor", "--checkpoint", str(folder / "monitor-state")],
+                stdout=monitor_output, stderr=live_errors)
+
             for _ in range(6):
                 result = run("ssh", "-F", "/dev/null", "-p", str(port),
                     "-o", "BatchMode=no", "-o", "NumberOfPasswordPrompts=1", "-o", "IdentityAgent=none",
@@ -112,6 +117,20 @@ LogLevel VERBOSE
             live_alerts = [json.loads(line) for line in live.splitlines()]
             if len(live_alerts) != 1 or live_alerts[0]["rule_id"] != "CHOMP-SSH-001":
                 raise RuntimeError(f"Unexpected live alerts: {live}")
+
+            for _ in range(50):
+                monitored = (folder / "monitor.jsonl").read_text()
+                if monitored.endswith("\n"):
+                    break
+                if monitor.poll() is not None:
+                    raise RuntimeError("Monitor exited: " + (folder / "scan-errors.txt").read_text())
+                time.sleep(0.1)
+            else:
+                raise RuntimeError("Managed monitor did not emit a live alert")
+            monitored_alerts = [json.loads(line) for line in monitored.splitlines()]
+            if not any(a["rule_id"] == "CHOMP-SSH-001" and a["event"]["source"]["ip"] == "127.0.0.1" for a in monitored_alerts):
+                raise RuntimeError("Managed monitor missed loopback SSH failures")
+            print("PASS: monitor command collected real SSH journal records and emitted a live alert")
             raw = ""
             for _ in range(20):
                 run("journalctl", "--sync")
@@ -152,7 +171,33 @@ LogLevel VERBOSE
             print(f"PASS: {len(failures)} real rejected SSH logins -> journal JSON -> one grouped alert")
             print("PASS: journal follow pipeline emitted an alert before EOF and remained running")
             print("PASS: restart after four failures preserved the window; replay did not duplicate alerts")
+            children_path = Path(f"/proc/{monitor.pid}/task/{monitor.pid}/children")
+            collector_pids = children_path.read_text().split()
+            if not collector_pids:
+                raise RuntimeError("Managed monitor has no live collector")
+            monitor.terminate()
+            monitor.wait(timeout=10)
+            for _ in range(50):
+                active = []
+                for pid in collector_pids:
+                    try:
+                        state = Path(f"/proc/{pid}/stat").read_text().split(")", 1)[1].split()[0]
+                        if state != "Z":
+                            active.append(pid)
+                    except FileNotFoundError:
+                        pass
+                if not active:
+                    break
+                time.sleep(0.1)
+            else:
+                raise RuntimeError("Collector remained running after monitor termination")
+            print("PASS: monitor termination also stopped its journal collector")
+
         finally:
+            if monitor is not None:
+                monitor.terminate()
+                monitor.wait(timeout=10)
+            monitor_output.close()
             if journal is not None:
                 journal.terminate()
                 journal.wait(timeout=10)

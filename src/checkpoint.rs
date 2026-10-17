@@ -58,11 +58,18 @@ fn deliver(dir: &Path, state: &mut Snapshot, output: &mut impl Write) -> Result<
 
 /// Input must replay through the saved journal cursor before supplying new records.
 /// Pending alerts are committed before output; a crash may repeat their stable IDs.
-pub fn scan(
+pub fn scan(engine: Engine, dir: &Path, input: impl BufRead, output: impl Write) -> Result<bool> {
+    scan_from(engine, dir, |_| Ok(input), output, false)
+}
+
+/// Open a collector only after state validation and while holding the checkpoint lock.
+/// Strict mode requires its first record to be the exact saved cursor.
+pub fn scan_from<R: BufRead>(
     engine: Engine,
     dir: &Path,
-    mut input: impl BufRead,
+    open: impl FnOnce(Option<&str>) -> Result<R>,
     mut output: impl Write,
+    strict: bool,
 ) -> Result<bool> {
     fs::create_dir_all(dir)?;
     let lock = OpenOptions::new()
@@ -111,6 +118,7 @@ pub fn scan(
     } else {
         Session::new(engine)
     };
+    let mut input = open(seeking.as_deref())?;
     let mut found = false;
     let mut line = String::new();
     let mut number = 0;
@@ -135,6 +143,9 @@ pub fn scan(
             .filter(|s| !s.is_empty() && s.len() <= 8192 && !s.chars().any(char::is_control))
             .ok_or_else(|| format!("journal line {number}: checkpoint input requires __CURSOR"))?;
         if let Some(anchor) = &seeking {
+            if strict && anchor != cursor {
+                return Err("saved journal cursor is unavailable; checkpoint unchanged; inspect journal retention before starting a new checkpoint".into());
+            }
             if anchor == cursor {
                 seeking = None;
                 let mut state = Snapshot {

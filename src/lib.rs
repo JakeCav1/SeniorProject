@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
 pub mod checkpoint;
+pub mod monitor;
 pub mod session;
 pub mod ssh;
 
