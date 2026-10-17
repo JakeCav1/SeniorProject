@@ -65,6 +65,9 @@ LogLevel VERBOSE
 """)
         # Standard privilege-separation runtime directory; no host SSH config changes.
         Path("/run/sshd").mkdir(mode=0o755, exist_ok=True)
+        journal = scanner = None
+        live_output = (folder / "alerts.jsonl").open("w")
+        live_errors = (folder / "scan-errors.txt").open("w")
         try:
             run("systemd-run", "--unit", unit, "--property=RuntimeMaxSec=60",
                 "--property=StandardOutput=journal", "--property=StandardError=journal",
@@ -77,6 +80,15 @@ LogLevel VERBOSE
                     time.sleep(0.1)
             else:
                 raise RuntimeError("Loopback SSH server did not start")
+            # Keep stdin open: an alert must be observable before the stream ends.
+            journal = subprocess.Popen(
+                ["journalctl", "-u", unit, "--no-pager", "-o", "json", "-n", "all", "-f"],
+                stdout=subprocess.PIPE, stderr=live_errors)
+            scanner = subprocess.Popen(
+                [str(binary), "scan", "-r", str(repo / "rules/ssh.yaml"),
+                 "--input-format", "journal"],
+                stdin=journal.stdout, stdout=live_output, stderr=live_errors)
+            journal.stdout.close()
             for _ in range(6):
                 result = run("ssh", "-F", "/dev/null", "-p", str(port),
                     "-o", "BatchMode=no", "-o", "NumberOfPasswordPrompts=1", "-o", "IdentityAgent=none",
@@ -86,6 +98,20 @@ LogLevel VERBOSE
                     env=client_env, stdin=subprocess.DEVNULL, start_new_session=True)
                 if result.returncode != 255 or "Permission denied" not in result.stderr:
                     raise RuntimeError(f"Expected rejected loopback login: {result.stderr}")
+            for _ in range(50):
+                live = (folder / "alerts.jsonl").read_text()
+                if live.endswith("\n"):
+                    break
+                if scanner.poll() is not None or journal.poll() is not None:
+                    raise RuntimeError("Live pipeline exited: " + (folder / "scan-errors.txt").read_text())
+                time.sleep(0.1)
+            else:
+                raise RuntimeError("No alert emitted while journal input remained open")
+            if scanner.poll() is not None or journal.poll() is not None:
+                raise RuntimeError("Live pipeline did not remain running")
+            live_alerts = [json.loads(line) for line in live.splitlines()]
+            if len(live_alerts) != 1 or live_alerts[0]["rule_id"] != "CHOMP-SSH-001":
+                raise RuntimeError(f"Unexpected live alerts: {live}")
             raw = ""
             for _ in range(20):
                 run("journalctl", "--sync")
@@ -105,7 +131,19 @@ LogLevel VERBOSE
             if alerts[0]["event"]["source"]["ip"] != "127.0.0.1":
                 raise RuntimeError("Alert did not originate from loopback")
             print(f"PASS: {len(failures)} real rejected SSH logins -> journal JSON -> one grouped alert")
+            print("PASS: journal follow pipeline emitted an alert before EOF and remained running")
         finally:
+            if journal is not None:
+                journal.terminate()
+                journal.wait(timeout=10)
+            if scanner is not None:
+                try:
+                    scanner.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    scanner.kill()
+                    scanner.wait(timeout=10)
+            live_output.close()
+            live_errors.close()
             run("systemctl", "stop", unit, check=False)
             run("systemctl", "reset-failed", unit, check=False)
 

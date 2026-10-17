@@ -1,0 +1,136 @@
+[
+  {
+    "name": "normal_logins",
+    "note": "Successful non-root logins should stay quiet.",
+    "lines": [
+      "2026-10-16T12:00:00+00:00 lab sshd[123]: Accepted publickey for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:01+00:00 lab sshd[123]: Accepted password for bob from 192.0.2.10 port 2222 ssh2"
+    ],
+    "expected_rules": []
+  },
+  {
+    "name": "mistyped_password_then_success",
+    "note": "Two retries followed by success are below the threshold.",
+    "lines": [
+      "2026-10-16T12:00:00+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:01+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:02+00:00 lab sshd[123]: Accepted password for alice from 192.0.2.10 port 2222 ssh2"
+    ],
+    "expected_rules": []
+  },
+  {
+    "name": "separate_sources",
+    "note": "Failures from distinct sources do not combine; distributed attacks remain a coverage gap.",
+    "lines": [
+      "2026-10-16T12:00:00+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:01+00:00 lab sshd[123]: Failed password for alice from 192.0.2.11 port 2222 ssh2",
+      "2026-10-16T12:00:02+00:00 lab sshd[123]: Failed password for alice from 192.0.2.12 port 2222 ssh2",
+      "2026-10-16T12:00:03+00:00 lab sshd[123]: Failed password for alice from 192.0.2.13 port 2222 ssh2",
+      "2026-10-16T12:00:04+00:00 lab sshd[123]: Failed password for alice from 192.0.2.14 port 2222 ssh2",
+      "2026-10-16T12:00:05+00:00 lab sshd[123]: Failed password for alice from 192.0.2.15 port 2222 ssh2"
+    ],
+    "expected_rules": []
+  },
+  {
+    "name": "separate_hosts",
+    "note": "Four failures per host must not combine across hosts.",
+    "lines": [
+      "2026-10-16T12:00:00+00:00 lab-0 sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:01+00:00 lab-1 sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:02+00:00 lab-0 sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:03+00:00 lab-1 sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:04+00:00 lab-0 sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:05+00:00 lab-1 sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:06+00:00 lab-0 sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:07+00:00 lab-1 sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2"
+    ],
+    "expected_rules": []
+  },
+  {
+    "name": "slow_failures",
+    "note": "No five failures fall within 60 seconds; slow attacks remain a coverage gap.",
+    "lines": [
+      "2026-10-16T12:00:00+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:20+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:40+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:01:01+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:01:21+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:01:41+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2"
+    ],
+    "expected_rules": []
+  },
+  {
+    "name": "password_spray_same_source",
+    "note": "Different usernames from one source combine; a continuing burst emits once.",
+    "lines": [
+      "2026-10-16T12:00:00+00:00 lab sshd[123]: Failed password for invalid user admin from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:01+00:00 lab sshd[123]: Failed password for invalid user test from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:02+00:00 lab sshd[123]: Failed password for invalid user oracle from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:03+00:00 lab sshd[123]: Failed password for invalid user guest from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:04+00:00 lab sshd[123]: Failed password for invalid user backup from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:05+00:00 lab sshd[123]: Failed password for invalid user deploy from 192.0.2.10 port 2222 ssh2"
+    ],
+    "expected_rules": [
+      "CHOMP-SSH-001"
+    ]
+  },
+  {
+    "name": "ipv6_aliases",
+    "note": "Equivalent IPv6 spellings belong to one source.",
+    "lines": [
+      "2026-10-16T12:00:00+00:00 lab sshd[123]: Failed password for alice from 2001:db8::1 port 2222 ssh2",
+      "2026-10-16T12:00:01+00:00 lab sshd[123]: Failed password for alice from 2001:0db8:0:0:0:0:0:1 port 2222 ssh2",
+      "2026-10-16T12:00:02+00:00 lab sshd[123]: Failed password for alice from 2001:db8::1 port 2222 ssh2",
+      "2026-10-16T12:00:03+00:00 lab sshd[123]: Failed password for alice from 2001:0db8:0:0:0:0:0:1 port 2222 ssh2",
+      "2026-10-16T12:00:04+00:00 lab sshd[123]: Failed password for alice from 2001:db8::1 port 2222 ssh2"
+    ],
+    "expected_rules": [
+      "CHOMP-SSH-001"
+    ]
+  },
+  {
+    "name": "second_burst_after_expiry",
+    "note": "The detection rearms after the first burst expires.",
+    "lines": [
+      "2026-10-16T12:00:00+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:01+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:02+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:03+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:04+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:01:10+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:01:11+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:01:12+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:01:13+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:01:14+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2"
+    ],
+    "expected_rules": [
+      "CHOMP-SSH-001",
+      "CHOMP-SSH-001"
+    ]
+  },
+  {
+    "name": "success_does_not_reset_failures",
+    "note": "The rule counts failures within a window, not consecutive failures.",
+    "lines": [
+      "2026-10-16T12:00:00+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:01+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:02+00:00 lab sshd[123]: Accepted password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:03+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:04+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2",
+      "2026-10-16T12:00:05+00:00 lab sshd[123]: Failed password for alice from 192.0.2.10 port 2222 ssh2"
+    ],
+    "expected_rules": [
+      "CHOMP-SSH-001"
+    ]
+  },
+  {
+    "name": "root_login_policy_review",
+    "note": "Authorized root administration also alerts; this is a policy-review heuristic, not proof of compromise.",
+    "lines": [
+      "2026-10-16T12:00:00+00:00 lab sshd[123]: Accepted publickey for root from 192.0.2.10 port 2222 ssh2"
+    ],
+    "expected_rules": [
+      "CHOMP-SSH-002"
+    ]
+  }
+]

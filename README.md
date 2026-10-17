@@ -4,7 +4,7 @@ A lightweight Rust endpoint detection and response project for UNIX systems and 
 
 ## Project progress
 
-Last updated: **2026-10-16**. Current phase: **SSH detection and verified Linux journal ingestion**. Completed items below describe the current implementation, not a production-ready EDR.
+Last updated: **2026-10-17**. Current phase: **SSH detection and verified Linux journal ingestion**. Completed items below describe the current implementation, not a production-ready EDR.
 
 ### Completed
 
@@ -16,7 +16,7 @@ Last updated: **2026-10-16**. Current phase: **SSH detection and verified Linux 
 - [x] Read JSON Lines from files or stdin and emit JSON or text alerts.
 - [x] Define script-friendly exit codes and bounded input handling.
 - [x] Include two demonstration rules and three sample events.
-- [x] Add 39 automated tests for the engine, CLI, SSH adapter, and correlation.
+- [x] Add 42 automated tests for the engine, CLI, SSH adapter, and correlation.
 - [x] Support rule exclusions (`none`) and optional case-insensitive matching.
 - [x] Load multiple rule files or folders and detect duplicate IDs across files.
 - [x] Select rules by ID for scans and list rule metadata as JSON Lines.
@@ -28,7 +28,7 @@ Last updated: **2026-10-16**. Current phase: **SSH detection and verified Linux 
 | Check | Latest result | Evidence / remaining work |
 | --- | --- | --- |
 | Windows build | Passed locally | Rust stable 1.98.1 |
-| Automated tests | 39 passed on Windows, Linux, and macOS | 11 engine, 14 CLI, 9 SSH/correlation, and 5 journal tests |
+| Automated tests | 42 passed locally; current CI pending | 11 engine, 14 CLI, 9 SSH/correlation, 5 journal, and 3 scenario suites (30 scenario/input combinations) |
 | Formatting | Passed locally | `cargo fmt --all -- --check` |
 | Lint | Passed locally | `cargo clippy --locked --all-targets -- -D warnings` |
 | Sample scan | Passed locally | Three events produce two alerts |
@@ -45,7 +45,8 @@ Last updated: **2026-10-16**. Current phase: **SSH detection and verified Linux 
 - [x] Add normalization for ISO-dated OpenSSH authentication logs.
 - [x] Verify actual SSH/journal ingestion on an isolated Linux CI host.
 - [ ] Validate the continuous journal pipeline, log rotation, and restart behavior on the target Linux distribution.
-- [ ] Build representative benign and malicious event fixtures; tune detection rules against both.
+- [x] Add ten labeled synthetic SSH scenarios across all three input formats.
+- [ ] Collect representative target-host data and tune rules against benign and suspicious activity.
 - [ ] Expand the starter rules into a tested default rule set.
 - [x] Add bounded time-window thresholds grouped by event fields.
 - [ ] Design explicit response policies and audit records before implementing endpoint actions.
@@ -77,6 +78,8 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 | 2026-10-01 | Added a persistent command prompt with help, exit/quit, quoted paths, and recovery after command errors | All 25 tests, Clippy, and release build passed on Windows |
 | 2026-10-16 | Added OpenSSH log normalization, grouped time-window thresholds, two SSH rules, and an end-to-end demo | 34 tests and Clippy pass locally; current branch CI pending |
 | 2026-10-16 | Added journal JSON ingestion and an isolated real-SSH Linux CI check | 39 tests, formatting, and lint pass on all three CI platforms; six actual rejected SSH logins produce one alert on Ubuntu ([run](https://github.com/rmart1368/SeniorProject/actions/runs/38957492982)) |
+
+| 2026-10-17 | Added ten labeled SSH scenarios and a continuous journal pipeline check | 42 tests and lint pass locally; live-stream CI verification pending |
 
 When updating this tracker, change the date, check off only completed work, record the platform and result of verification, and append a dated progress entry. Keep configured checks marked pending until they actually run.
 

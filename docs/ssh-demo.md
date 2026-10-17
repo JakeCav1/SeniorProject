@@ -64,7 +64,7 @@ Use JSON Lines (`-o json`), not `json-pretty` or `json-seq`. Do not pass unfilte
 
 ## Isolated Linux integration test
 
-The Linux CI job runs `sudo python3 scripts/live-ssh-test.py target/debug/chompedr`. It requires systemd and OpenSSH server on a disposable test host. The script creates its own temporary SSH keys/configuration and a transient service restricted to a random loopback port. Six password login attempts use a randomly generated nonexistent username; every login must be rejected. It reads that service's actual journal records and requires exactly one repeated-failure alert.
+The Linux CI job runs `sudo python3 scripts/live-ssh-test.py target/debug/chompedr`. It requires systemd and OpenSSH server on a disposable test host. The script creates its own temporary SSH keys/configuration and a transient service restricted to a random loopback port. Six password login attempts use a randomly generated nonexistent username; every login must be rejected. It reads that service's actual journal records and requires exactly one repeated-failure alert. A second check follows the journal continuously and requires an alert before EOF while both processes remain running.
 
 The transient service has a 60-second runtime limit and is stopped in cleanup. The script never modifies the host SSH service or creates users. This test verifies a real OpenSSH/journald pipeline; it does not establish detection accuracy across distributions or production workloads. See the latest GitHub Actions run for the result.
 
@@ -97,3 +97,24 @@ Tests cover normalization, invalid log formats, group isolation, boundary times,
 These are review heuristics, not proof of compromise. Legitimate password mistakes and authorized root access can trigger them. Use local policy and representative real logs to tune rules before enabling any future responses. Automated endpoint actions are not implemented.
 
 Implementation references: [OpenSSH authentication logging](https://github.com/openssh/openssh-portable/blob/master/auth.c), [Chrono timestamp parsing](https://docs.rs/chrono/latest/chrono/struct.DateTime.html), [systemd journal fields](https://github.com/systemd/systemd/blob/main/man/systemd.journal-fields.xml), and [journal JSON format](https://github.com/systemd/systemd/blob/main/docs/JOURNAL_EXPORT_FORMATS.md).
+
+## Labeled regression scenarios
+
+`tests/fixtures/ssh-scenarios.json` contains ten authored synthetic scenarios, not captured production traffic. `cargo test --test scenarios` checks each through SSH text, normalized JSON, and journal JSON: 30 combinations, including alert IDs, counts, and CLI exit codes.
+
+| Scenario | Expected alerts |
+| --- | --- |
+| Normal non-root logins | None |
+| Two password mistakes followed by success | None |
+| Failures from separate sources | None; distributed attempts are a coverage gap |
+| Four failures each on separate hosts | None; host counters stay separate |
+| Failures spread beyond the time window | None; slow attempts are a coverage gap |
+| Six different usernames from one source | One repeated-failure alert |
+| Equivalent IPv6 address spellings | One repeated-failure alert |
+| Two bursts separated by expiry | Two repeated-failure alerts |
+| A successful login between five failures | One repeated-failure alert; success does not reset the window |
+| Successful root login | One policy-review alert, even if authorized |
+
+These fixtures lock down intended behavior; they do not measure production false-positive or false-negative rates. Before tuning thresholds, collect labeled samples from the intended deployment environment. Keep benign administration and legitimate retries in that evaluation set.
+
+The continuous CI check verifies alert delivery without closing input. Restart persistence, cursor recovery, journal rotation, and target-distribution deployment remain unverified. A new scan starts a fresh correlation window; restarting can therefore miss a burst split across sessions.
