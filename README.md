@@ -28,12 +28,12 @@ Last updated: **2026-10-17**. Current phase: **Managed Linux SSH monitoring and 
 | Check | Latest result | Evidence / remaining work |
 | --- | --- | --- |
 | Windows build | Passed locally | Rust stable 1.98.1 |
-| Automated tests | 54 passed on Linux; 52 on Windows and macOS | 11 engine, 14 CLI, 9 SSH/correlation, 5 journal, and 3 scenario suites (30 scenario/input combinations), 8 checkpoint tests, and platform-specific monitor tests |
+| Automated tests | 57 passed on Linux; 55 on Windows and macOS | 11 engine, 14 CLI, 9 SSH/correlation, 5 journal, and 3 scenario suites (30 scenario/input combinations), 11 checkpoint/status tests, and platform-specific monitor tests |
 | Formatting | Passed locally | `cargo fmt --all -- --check` |
 | Lint | Passed locally | `cargo clippy --locked --all-targets -- -D warnings` |
 | Sample scan | Passed locally | Three events produce two alerts |
 | Linux and macOS | Passed current branch CI | Formatting, lint, and platform-specific suites passed |
-| GitHub CI | All three platforms passed | [Verified run for b887302](https://github.com/rmart1368/SeniorProject/actions/runs/39051370331) |
+| GitHub CI | All three platforms passed | [Verified run for afe691e](https://github.com/rmart1368/SeniorProject/actions/runs/39051959097) |
 | Real Linux SSH integration | Passed on Ubuntu CI | Six rejected loopback logins produced one grouped alert; continuous pipeline emitted before EOF |
 
 ### Next work
@@ -86,7 +86,7 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 
 | 2026-10-17 | Added managed Linux monitoring with built-in SSH rules, default checkpoints, cursor availability checks, and collector cleanup | All three platforms passed; real Linux monitoring emitted alerts and stopped its collector on termination ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39051370331)); installed Windows launcher updated |
 
-| 2026-10-17 | Added read-only monitor status for saved progress, checkpoint ownership, and pending alerts | 55 Windows tests and lint pass locally; full CI pending |
+| 2026-10-17 | Added read-only monitor status for saved progress, checkpoint ownership, and pending alerts | 57 Linux and 55 Windows/macOS tests passed; live Linux status check passed ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39051959097)); installed Windows command verified |
 
 When updating this tracker, change the date, check off only completed work, record the platform and result of verification, and append a dated progress entry. Keep configured checks marked pending until they actually run.
 
