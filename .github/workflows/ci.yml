@@ -21,3 +21,17 @@ jobs:
       - name: Test real SSH authentication logs on Linux
         if: runner.os == 'Linux'
         run: sudo python3 scripts/live-ssh-test.py target/debug/chompedr
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build native release executable
+        run: cargo +stable build --release --locked
+      - name: Package and smoke-test extracted build
+        run: python scripts/package.py
+      - name: Upload tested snapshot package
+        uses: actions/upload-artifact@v4
+        with:
+          name: chomp-edr-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14

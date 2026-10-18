@@ -4,7 +4,7 @@ A lightweight Rust endpoint detection and response project for UNIX systems and 
 
 ## Project progress
 
-Last updated: **2026-10-17**. Current phase: **Managed Linux SSH monitoring and restart recovery**. Completed items below describe the current implementation, not a production-ready EDR.
+Last updated: **2026-10-18**. Current phase: **Managed Linux SSH monitoring and restart recovery**. Completed items below describe the current implementation, not a production-ready EDR.
 
 ### Completed
 
@@ -85,8 +85,13 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 | 2026-10-17 | Added managed Linux monitoring with built-in SSH rules, default checkpoints, cursor availability checks, and collector cleanup | All three platforms passed; real Linux monitoring emitted alerts and stopped its collector on termination ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39051370331)); installed Windows launcher updated |
 | 2026-10-17 | Added read-only monitor status for saved progress, checkpoint ownership, and pending alerts | 57 Linux and 55 Windows/macOS tests passed; live Linux status check passed ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39051959097)); installed Windows command verified |
 | 2026-10-17 | Added a Linux user installer and optional disabled systemd user service | Five isolated installer tests and systemd unit validation passed; all three platform suites and real Linux monitoring passed ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39080606501)) |
+| 2026-10-18 | Added native snapshot packages, checksums, manifests, and extracted-package demo checks | Local Windows packaging and cross-platform CI verification pending |
 
 When updating this tracker, change the date, check off only completed work, record the platform and result of verification, and append a dated progress entry. Keep configured checks marked pending until they actually run.
+
+## Download a build
+
+The CI workflow packages native Windows, Linux, and macOS executables with rules, sample events, documentation, and checksums. Rust is not required to run a downloaded build. See the [download guide](docs/downloads.md) for choosing an architecture, finding artifacts, and running the demo. These are unsigned development snapshots with a 14-day artifact retention period.
 
 ## Linux installation
 

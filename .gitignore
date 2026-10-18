@@ -3,3 +3,5 @@
 !examples/ssh-demo.log
 
 /.chomp-state/
+
+/dist/
