@@ -28,13 +28,14 @@ Last updated: **2026-10-18**. Current phase: **Linux SSH monitoring and process 
 | Check | Latest result | Evidence / remaining work |
 | --- | --- | --- |
 | Windows build | Passed locally | Rust stable 1.98.1 |
-| Automated tests | 57 passed on Linux; 55 on Windows and macOS | 11 engine, 14 CLI, 9 SSH/correlation, 5 journal, and 3 scenario suites (30 scenario/input combinations), 11 checkpoint/status tests, and platform-specific monitor tests |
+| Automated tests | 60 passed on Linux; 59 on Windows and macOS | 11 engine, 14 CLI, 9 SSH/correlation, 5 journal, and 3 scenario suites (30 scenario/input combinations), 11 checkpoint/status tests, and platform-specific monitor/process tests |
 | Formatting | Passed locally | `cargo fmt --all -- --check` |
 | Lint | Passed locally | `cargo clippy --locked --all-targets -- -D warnings` |
 | Sample scan | Passed locally | Three events produce two alerts |
 | Linux and macOS | Passed current branch CI | Formatting, lint, and platform-specific suites passed |
-| GitHub CI | All three platforms passed | [Verified run for 33205f8](https://github.com/rmart1368/SeniorProject/actions/runs/39137428057) |
+| GitHub CI | All three platforms passed | [Verified run for 552bccd](https://github.com/rmart1368/SeniorProject/actions/runs/39140309074) |
 | Downloadable packages | All three native packages passed | Extracted executable demo and manifest hashes verified before upload |
+| Real Linux process integration | Passed on Ubuntu CI | Newly launched process alerted once; raw observations and scan replay verified |
 | Linux installer | 5 tests passed | User installation, unit validation, upgrades, path handling, and symlink refusal |
 | Real Linux SSH integration | Passed on Ubuntu CI | Six rejected loopback logins produced one grouped alert; continuous pipeline emitted before EOF |
 
@@ -63,7 +64,7 @@ Dates below are the original pitch targets, not revised delivery commitments. Ow
 | 2026-10-01 | Skeleton code and project design | Team | Rust skeleton implemented; broader EDR architecture remains open |
 | 2026-10-22 | Configurable rule engine | Jake | Stateless matching and grouped time-window thresholds implemented; all three CI platforms pass |
 | 2026-10-22 | CLI compatibility | Raymon | Interactive prompt, rule management, and SSH/journal input pass all three CI platforms |
-| 2026-10-22 | Robust default rule set | Jake | Two starter rules and two SSH rules; representative-data tuning and expansion pending |
+| 2026-10-22 | Robust default rule set | Jake | Two starter, two SSH, and two process review rules; representative-data tuning remains pending |
 | 2026-11-01 | OS compatibility and quality-of-life improvements; optional UI start | Raymon (OS), Michael (UI) | Portable core and Ubuntu SSH/journal integration verified; deployment and optional GUI pending |
 | 2026-11-12 | Finalized product | Team | Pending collection, detection coverage, response implementation, and end-to-end validation |
 
@@ -87,7 +88,7 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 | 2026-10-17 | Added read-only monitor status for saved progress, checkpoint ownership, and pending alerts | 57 Linux and 55 Windows/macOS tests passed; live Linux status check passed ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39051959097)); installed Windows command verified |
 | 2026-10-17 | Added a Linux user installer and optional disabled systemd user service | Five isolated installer tests and systemd unit validation passed; all three platform suites and real Linux monitoring passed ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39080606501)) |
 | 2026-10-18 | Added native snapshot packages, checksums, manifests, and extracted-package demo checks | Windows x86_64, Linux x86_64, and macOS ARM64 archives passed extracted demo/hash checks and uploaded successfully ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39137428057)) |
-| 2026-10-18 | Added Linux process polling, raw event export, and two process review rules | 59 Windows tests and lint passed locally; real-process Linux CI pending |
+| 2026-10-18 | Added Linux process polling, raw event export, and two process review rules | 60 Linux and 59 Windows/macOS tests passed; real process observed once and replayed through scan; native packages passed ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39140309074)) |
 
 When updating this tracker, change the date, check off only completed work, record the platform and result of verification, and append a dated progress entry. Keep configured checks marked pending until they actually run.
 
