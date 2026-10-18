@@ -33,7 +33,8 @@ Last updated: **2026-10-18**. Current phase: **Managed Linux SSH monitoring and 
 | Lint | Passed locally | `cargo clippy --locked --all-targets -- -D warnings` |
 | Sample scan | Passed locally | Three events produce two alerts |
 | Linux and macOS | Passed current branch CI | Formatting, lint, and platform-specific suites passed |
-| GitHub CI | All three platforms passed | [Verified run for 275a6b4](https://github.com/rmart1368/SeniorProject/actions/runs/39080606501) |
+| GitHub CI | All three platforms passed | [Verified run for 33205f8](https://github.com/rmart1368/SeniorProject/actions/runs/39137428057) |
+| Downloadable packages | All three native packages passed | Extracted executable demo and manifest hashes verified before upload |
 | Linux installer | 5 tests passed | User installation, unit validation, upgrades, path handling, and symlink refusal |
 | Real Linux SSH integration | Passed on Ubuntu CI | Six rejected loopback logins produced one grouped alert; continuous pipeline emitted before EOF |
 
@@ -85,7 +86,7 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 | 2026-10-17 | Added managed Linux monitoring with built-in SSH rules, default checkpoints, cursor availability checks, and collector cleanup | All three platforms passed; real Linux monitoring emitted alerts and stopped its collector on termination ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39051370331)); installed Windows launcher updated |
 | 2026-10-17 | Added read-only monitor status for saved progress, checkpoint ownership, and pending alerts | 57 Linux and 55 Windows/macOS tests passed; live Linux status check passed ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39051959097)); installed Windows command verified |
 | 2026-10-17 | Added a Linux user installer and optional disabled systemd user service | Five isolated installer tests and systemd unit validation passed; all three platform suites and real Linux monitoring passed ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39080606501)) |
-| 2026-10-18 | Added native snapshot packages, checksums, manifests, and extracted-package demo checks | Local Windows packaging and cross-platform CI verification pending |
+| 2026-10-18 | Added native snapshot packages, checksums, manifests, and extracted-package demo checks | Windows x86_64, Linux x86_64, and macOS ARM64 archives passed extracted demo/hash checks and uploaded successfully ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39137428057)) |
 
 When updating this tracker, change the date, check off only completed work, record the platform and result of verification, and append a dated progress entry. Keep configured checks marked pending until they actually run.
 
