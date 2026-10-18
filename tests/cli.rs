@@ -23,7 +23,7 @@ fn interactive_session_runs_multiple_commands_and_exits() {
     assert!(output.status.success());
     assert!(output.stderr.is_empty());
     let text = String::from_utf8(output.stdout).unwrap();
-    assert!(text.contains("Valid: 6 rule(s)"));
+    assert!(text.contains("Valid: 7 rule(s)"));
     assert!(text.contains("Sensitive account file modified"));
     assert!(text.contains("status 1"));
     assert!(text.contains("Goodbye."));
@@ -40,7 +40,7 @@ fn interactive_session_recovers_from_invalid_commands_and_stdin_scans() {
     assert!(errors.contains("unclosed quote"));
     assert!(String::from_utf8(output.stdout)
         .unwrap()
-        .contains("Valid: 6 rule(s)"));
+        .contains("Valid: 7 rule(s)"));
 }
 
 #[test]

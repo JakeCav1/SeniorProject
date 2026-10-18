@@ -4,7 +4,7 @@ A lightweight Rust endpoint detection and response project for UNIX systems and 
 
 ## Project progress
 
-Last updated: **2026-10-18**. Current phase: **Linux SSH monitoring and process observation**. Completed items below describe the current implementation, not a production-ready EDR.
+Last updated: **2026-10-18**. Current phase: **Linux SSH, process, and selected-file monitoring**. Completed items below describe the current implementation, not a production-ready EDR.
 
 ### Completed
 
@@ -89,6 +89,7 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 | 2026-10-17 | Added a Linux user installer and optional disabled systemd user service | Five isolated installer tests and systemd unit validation passed; all three platform suites and real Linux monitoring passed ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39080606501)) |
 | 2026-10-18 | Added native snapshot packages, checksums, manifests, and extracted-package demo checks | Windows x86_64, Linux x86_64, and macOS ARM64 archives passed extracted demo/hash checks and uploaded successfully ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39137428057)) |
 | 2026-10-18 | Added Linux process polling, raw event export, and two process review rules | 60 Linux and 59 Windows/macOS tests passed; real process observed once and replayed through scan; native packages passed ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39140309074)) |
+| 2026-10-18 | Added selected-file metadata monitoring and raw-event export | 62 Windows tests and lint passed locally; real-file Linux checks pending |
 
 When updating this tracker, change the date, check off only completed work, record the platform and result of verification, and append a dated progress entry. Keep configured checks marked pending until they actually run.
 
@@ -106,6 +107,10 @@ python3 scripts/install-linux.py
 ```
 
 Add `$HOME/.local/bin` to your PATH if needed. Add `--service` to write an optional systemd user-service file; it remains disabled and stopped. See the [installation guide](docs/linux-install.md) for startup, upgrades, journal access, and removal.
+
+## Selected-file monitoring
+
+`chompedr watch-files --path /etc/passwd --path /etc/shadow` watches selected Linux paths for metadata changes without reading contents. It reports creation, removal, and changed metadata; polling can miss changes between observations. See the [file monitoring guide](docs/file-monitoring.md).
 
 ## Linux process monitoring
 

@@ -1,0 +1,11 @@
+version: 1
+rules:
+  - id: CHOMP-FILE-001
+    name: Selected file metadata changed
+    description: Review creation, removal, replacement, or metadata changes on explicitly watched paths; legitimate maintenance also matches.
+    severity: medium
+    detection:
+      all:
+        - field: event.type
+          op: equals
+          value: file_metadata_changed

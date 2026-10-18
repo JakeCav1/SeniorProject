@@ -20,6 +20,21 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Watch selected Linux file paths for metadata changes without reading contents.
+    WatchFiles {
+        /// Absolute file path; repeat to select up to 64 paths. Not recursive.
+        #[arg(long = "path", required = true)]
+        paths: Vec<PathBuf>,
+        #[arg(long, default_value_t = 1000, value_parser = clap::value_parser!(u64).range(100..=60000))]
+        interval_ms: u64,
+        #[arg(long, value_parser = clap::value_parser!(u64).range(1..))]
+        samples: Option<u64>,
+        /// Emit raw observation events instead of alerts.
+        #[arg(long, conflicts_with = "rules")]
+        events: bool,
+        #[arg(short, long)]
+        rules: Vec<PathBuf>,
+    },
     /// Poll Linux processes and emit review alerts (or raw observation events).
     WatchProcesses {
         #[arg(long, default_value_t = 1000, value_parser = clap::value_parser!(u64).range(100..=60000))]
@@ -216,6 +231,33 @@ fn load(source: RuleSource) -> Result<Engine, Box<dyn std::error::Error>> {
 fn run(cli: Cli) -> Result<u8, Box<dyn std::error::Error>> {
     let mut out = io::BufWriter::new(io::stdout().lock());
     match cli.command {
+        Command::WatchFiles {
+            paths,
+            interval_ms,
+            samples,
+            events,
+            rules,
+        } => {
+            let engine = if rules.is_empty() {
+                Engine::from_yaml(include_str!("../rules/file-watch.yaml"))?
+            } else {
+                load(RuleSource { rules })?
+            };
+            let mut session = chomp_edr::session::Session::new(engine);
+            chomp_edr::files::watch(paths, interval_ms, samples, |event| {
+                let rows = if events {
+                    vec![event.clone()]
+                } else {
+                    session.process(event)?
+                };
+                for row in rows {
+                    serde_json::to_writer(&mut out, &row).map_err(|e| e.to_string())?;
+                    writeln!(out).map_err(|e| e.to_string())?;
+                }
+                out.flush().map_err(|e| e.to_string())
+            })?;
+        }
+
         Command::WatchProcesses {
             interval_ms,
             samples,
@@ -516,7 +558,9 @@ fn interactive() -> Result<u8, Box<dyn std::error::Error>> {
         };
         if matches!(
             &cli.command,
-            Command::Monitor { status: false, .. } | Command::WatchProcesses { .. }
+            Command::Monitor { status: false, .. }
+                | Command::WatchProcesses { .. }
+                | Command::WatchFiles { .. }
         ) {
             eprintln!(
                 "chompedr: run live monitoring from your system terminal so Ctrl+C can stop it."
