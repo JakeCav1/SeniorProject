@@ -4,7 +4,7 @@ A lightweight Rust endpoint detection and response project for UNIX systems and 
 
 ## Project progress
 
-Last updated: **2026-10-18**. Current phase: **Managed Linux SSH monitoring and restart recovery**. Completed items below describe the current implementation, not a production-ready EDR.
+Last updated: **2026-10-18**. Current phase: **Linux SSH monitoring and process observation**. Completed items below describe the current implementation, not a production-ready EDR.
 
 ### Completed
 
@@ -87,6 +87,7 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 | 2026-10-17 | Added read-only monitor status for saved progress, checkpoint ownership, and pending alerts | 57 Linux and 55 Windows/macOS tests passed; live Linux status check passed ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39051959097)); installed Windows command verified |
 | 2026-10-17 | Added a Linux user installer and optional disabled systemd user service | Five isolated installer tests and systemd unit validation passed; all three platform suites and real Linux monitoring passed ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39080606501)) |
 | 2026-10-18 | Added native snapshot packages, checksums, manifests, and extracted-package demo checks | Windows x86_64, Linux x86_64, and macOS ARM64 archives passed extracted demo/hash checks and uploaded successfully ([run](https://github.com/rmart1368/SeniorProject/actions/runs/39137428057)) |
+| 2026-10-18 | Added Linux process polling, raw event export, and two process review rules | 59 Windows tests and lint passed locally; real-process Linux CI pending |
 
 When updating this tracker, change the date, check off only completed work, record the platform and result of verification, and append a dated progress entry. Keep configured checks marked pending until they actually run.
 
@@ -104,6 +105,10 @@ python3 scripts/install-linux.py
 ```
 
 Add `$HOME/.local/bin` to your PATH if needed. Add `--service` to write an optional systemd user-service file; it remains disabled and stopped. See the [installation guide](docs/linux-install.md) for startup, upgrades, journal access, and removal.
+
+## Linux process monitoring
+
+`chompedr watch-processes` observes newly readable Linux processes and emits review alerts for temporary-directory/shared-memory executables. Use `--events` for normalized event output and `--include-existing` to include the first snapshot. This is polling and can miss short-lived processes. See the [process monitoring guide](docs/process-monitoring.md).
 
 ## Live Linux monitoring
 

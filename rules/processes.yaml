@@ -1,0 +1,30 @@
+version: 1
+rules:
+  - id: CHOMP-PROC-001
+    name: Process observed running from a temporary directory
+    description: Review heuristic; installers and development tools may legitimately match.
+    severity: medium
+    detection:
+      all:
+        - field: event.type
+          op: equals
+          value: process_observed
+      any:
+        - field: process.executable
+          op: starts_with
+          value: /tmp/
+        - field: process.executable
+          op: starts_with
+          value: /var/tmp/
+  - id: CHOMP-PROC-002
+    name: Process observed running from shared memory storage
+    description: Review executable use of /dev/shm; this is not proof of compromise.
+    severity: medium
+    detection:
+      all:
+        - field: event.type
+          op: equals
+          value: process_observed
+        - field: process.executable
+          op: starts_with
+          value: /dev/shm/

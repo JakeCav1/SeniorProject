@@ -21,6 +21,9 @@ jobs:
       - name: Test real SSH authentication logs on Linux
         if: runner.os == 'Linux'
         run: sudo python3 scripts/live-ssh-test.py target/debug/chompedr
+      - name: Test real Linux process observations
+        if: runner.os == 'Linux'
+        run: python3 scripts/live-process-test.py target/debug/chompedr
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

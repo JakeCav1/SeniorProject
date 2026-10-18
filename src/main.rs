@@ -20,6 +20,23 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Poll Linux processes and emit review alerts (or raw observation events).
+    WatchProcesses {
+        #[arg(long, default_value_t = 1000, value_parser = clap::value_parser!(u64).range(100..=60000))]
+        interval_ms: u64,
+        /// Stop after this many snapshots, including the initial baseline.
+        #[arg(long, value_parser = clap::value_parser!(u64).range(1..))]
+        samples: Option<u64>,
+        /// Emit observations for processes already present in the first snapshot.
+        #[arg(long)]
+        include_existing: bool,
+        /// Emit raw JSON events instead of alerts; pipe them to scan for custom processing.
+        #[arg(long, conflicts_with = "rules")]
+        events: bool,
+        /// Override the embedded process review rules.
+        #[arg(short, long)]
+        rules: Vec<PathBuf>,
+    },
     /// Monitor Linux SSH journal records with automatic checkpoint recovery.
     Monitor {
         /// YAML sources; omit to use the built-in SSH rules.
@@ -199,6 +216,33 @@ fn load(source: RuleSource) -> Result<Engine, Box<dyn std::error::Error>> {
 fn run(cli: Cli) -> Result<u8, Box<dyn std::error::Error>> {
     let mut out = io::BufWriter::new(io::stdout().lock());
     match cli.command {
+        Command::WatchProcesses {
+            interval_ms,
+            samples,
+            include_existing,
+            events,
+            rules,
+        } => {
+            let engine = if rules.is_empty() {
+                Engine::from_yaml(include_str!("../rules/processes.yaml"))?
+            } else {
+                load(RuleSource { rules })?
+            };
+            let mut session = chomp_edr::session::Session::new(engine);
+            chomp_edr::processes::collect(interval_ms, samples, include_existing, |event| {
+                let rows = if events {
+                    vec![event.clone()]
+                } else {
+                    session.process(event)?
+                };
+                for row in rows {
+                    serde_json::to_writer(&mut out, &row).map_err(|e| e.to_string())?;
+                    writeln!(out).map_err(|e| e.to_string())?;
+                }
+                out.flush().map_err(|e| e.to_string())
+            })?;
+        }
+
         Command::Monitor {
             rules,
             checkpoint,
@@ -470,8 +514,13 @@ fn interactive() -> Result<u8, Box<dyn std::error::Error>> {
                 continue;
             }
         };
-        if matches!(&cli.command, Command::Monitor { status: false, .. }) {
-            eprintln!("chompedr: run chompedr monitor from your system terminal so Ctrl+C can stop monitoring.");
+        if matches!(
+            &cli.command,
+            Command::Monitor { status: false, .. } | Command::WatchProcesses { .. }
+        ) {
+            eprintln!(
+                "chompedr: run live monitoring from your system terminal so Ctrl+C can stop it."
+            );
             continue;
         }
         // The session owns stdin. Letting scans consume it would interpret later
