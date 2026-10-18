@@ -122,7 +122,7 @@ fn changed_detection_or_selection_cannot_reuse_checkpoint() {
 }
 
 #[test]
-fn concurrent_writer_is_rejected_and_os_lock_is_released() {
+fn concurrent_writer_is_rejected_and_unlock_allows_reuse() {
     let dir = Temp::new();
     let lock = std::fs::OpenOptions::new()
         .read(true)
@@ -138,6 +138,9 @@ fn concurrent_writer_is_rejected_and_os_lock_is_released() {
             .to_string()
             .contains("locked")
     );
+    // Release explicitly before reuse: parallel CLI tests may briefly inherit
+    // the descriptor between fork and exec on Unix.
+    lock.unlock().unwrap();
     drop(lock);
     assert!(scan(&dir, history(1)).is_empty());
 }
@@ -260,6 +263,9 @@ fn status_reports_locked_checkpoint_and_pending_delivery() {
     assert_eq!(state["in_use"], true);
     assert_eq!(state["pending_alerts"], 1);
     assert_eq!(state["collector_health"], "not_checked");
+    // Release explicitly before reuse: parallel CLI tests may briefly inherit
+    // the descriptor between fork and exec on Unix.
+    lock.unlock().unwrap();
     drop(lock);
     assert_eq!(scan(&dir, history(5)).len(), 1);
 }
