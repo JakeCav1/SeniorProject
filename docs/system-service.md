@@ -34,6 +34,10 @@ Select at most 64 files or directories. Directories are recursive. Paths contain
 
 For an extracted Linux package, add `--binary ./chompedr`. For staging without root or activation, use `--destdir /absolute/staging-directory`; generated unit paths still describe the final installed system.
 
+## Web dashboard
+
+The [read-only web dashboard](dashboard.md) displays the collectors' alerts, embedded rule sources, service status and diagnostics. Its separate unprivileged service listens on localhost and can be reached through an SSH tunnel. Rebuild/reinstall the updated binary before installing the dashboard.
+
 ## Logs and control
 
 ```sh

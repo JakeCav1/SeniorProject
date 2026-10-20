@@ -79,6 +79,8 @@ enum Command {
         #[arg(short, long, value_enum, default_value = "text")]
         format: Format,
     },
+    /// Export embedded rule metadata and original YAML as one JSON document.
+    ExportRules,
     /// Evaluate JSON Lines events from a file or stdin; emit matching alerts.
     Scan {
         #[arg(long, value_enum, default_value = "json")]
@@ -251,6 +253,36 @@ fn list_internal_rules(
     Ok(())
 }
 
+/// Always inspect compiled defaults, even when a rules directory exists beside the binary.
+fn export_embedded_rules(out: &mut impl Write) -> Result<(), Box<dyn std::error::Error>> {
+    let mut files = Vec::new();
+    for (file, yaml) in BUNDLED_RULES {
+        let engine = Engine::from_yaml(yaml)?;
+        let rules: Vec<_> = engine
+            .rules()
+            .map(|r| {
+                serde_json::json!({
+                    "id": r.id, "name": r.name, "description": r.description,
+                    "severity": r.severity, "enabled": r.enabled,
+                    "threshold": r.threshold.as_ref().map(|t| serde_json::json!({
+                        "count": t.count, "window_seconds": t.window_seconds,
+                        "group_by": t.group_by
+                    }))
+                })
+            })
+            .collect();
+        files.push(serde_json::json!({"file": file, "yaml": yaml, "rules": rules}));
+    }
+    serde_json::to_writer(
+        &mut *out,
+        &serde_json::json!({
+            "version": env!("CARGO_PKG_VERSION"), "source": "embedded", "files": files
+        }),
+    )?;
+    writeln!(out)?;
+    Ok(())
+}
+
 fn run(cli: Cli) -> Result<u8, Box<dyn std::error::Error>> {
     let mut out = io::BufWriter::new(io::stdout().lock());
     match cli.command {
@@ -331,6 +363,7 @@ fn run(cli: Cli) -> Result<u8, Box<dyn std::error::Error>> {
                     .map_err(|e| format!("monitor: {e}"))?;
             }
         }
+        Command::ExportRules => export_embedded_rules(&mut out)?,
         Command::ListRules { format } => {
             list_internal_rules(&mut out, format)?;
         }

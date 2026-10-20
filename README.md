@@ -100,6 +100,10 @@ When updating this tracker, change the date, check off only completed work, reco
 
 The CI workflow packages native Windows, Linux, and macOS executables with rules, sample events, documentation, and checksums. Rust is not required to run a downloaded build. See the [download guide](docs/downloads.md) for choosing an architecture, finding artifacts, and running the demo. These are unsigned development snapshots with a 14-day artifact retention period.
 
+## Web dashboard
+
+A local read-only dashboard shows retained alerts, bundled rule YAML, collector status and diagnostics. It runs as a separate unprivileged system service on the VM and can be viewed from a desktop over an SSH tunnel. See the [dashboard installation and access guide](docs/dashboard.md); existing service installations need the updated binary for embedded-rule export.
+
 ## Always-on Linux services
 
 Run SSH, process and selected-file collectors in the background, starting at boot and restarting automatically after unexpected exits:
