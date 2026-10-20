@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DESTINATION = Path("/usr/local/lib/chomp-edr/dashboard")
 BINARY = Path("/usr/local/lib/chomp-edr/chompedr")
 UNIT = Path("/etc/systemd/system/chompedr-dashboard.service")
+sys.dont_write_bytecode = True
 SPEC = importlib.util.spec_from_file_location("chomp_installer", Path(__file__).with_name("install-system-linux.py"))
 BASE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(BASE)
