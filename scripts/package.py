@@ -67,7 +67,7 @@ def main():
         files += sorted(p.relative_to(REPO) for p in (REPO / "rules").glob("*.yaml"))
         files += sorted(p.relative_to(REPO) for p in (REPO / "docs").glob("*.md"))
         if system == "linux":
-            files += [Path("scripts/install-linux.py")]
+            files += [Path("scripts/install-linux.py"), Path("scripts/install-system-linux.py")]
         for relative in files:
             target = package / relative
             target.parent.mkdir(parents=True, exist_ok=True)

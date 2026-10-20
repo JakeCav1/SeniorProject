@@ -100,6 +100,20 @@ When updating this tracker, change the date, check off only completed work, reco
 
 The CI workflow packages native Windows, Linux, and macOS executables with rules, sample events, documentation, and checksums. Rust is not required to run a downloaded build. See the [download guide](docs/downloads.md) for choosing an architecture, finding artifacts, and running the demo. These are unsigned development snapshots with a 14-day artifact retention period.
 
+## Always-on Linux services
+
+Run SSH, process and selected-file collectors in the background, starting at boot and restarting automatically after unexpected exits:
+
+```sh
+cargo build --release --locked
+sudo python3 scripts/install-system-linux.py
+sudo systemctl daemon-reload
+sudo systemctl enable --now chompedr.target
+sudo systemctl status chompedr-ssh chompedr-processes chompedr-files
+```
+
+These system services run as root and default to watching account-file metadata. See the [system-service guide](docs/system-service.md) for custom watched paths, logs, crash/reboot checks, upgrades and recovery limits. The installer writes files; the explicit systemctl commands activate monitoring.
+
 ## Linux installation
 
 Build on Linux and install into your user account:

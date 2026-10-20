@@ -27,6 +27,12 @@ jobs:
       - name: Test selected-file metadata monitoring
         if: runner.os == 'Linux'
         run: python3 scripts/live-file-test.py target/debug/chompedr
+      - name: Test system service installer and unit files
+        if: runner.os == 'Linux'
+        run: python3 scripts/test-install-system-linux.py target/debug/chompedr
+      - name: Test background collectors and automatic restart
+        if: runner.os == 'Linux'
+        run: sudo python3 scripts/live-system-service-test.py target/debug/chompedr
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
