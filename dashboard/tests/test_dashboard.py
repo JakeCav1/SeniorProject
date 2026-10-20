@@ -123,6 +123,10 @@ class HttpTests(unittest.TestCase):
             with self.request(asset) as response:
                 self.assertEqual(response.status, 200)
 
+    def test_forwarded_local_port_is_allowed(self):
+        with self.request("/api/snapshot", {"Host": "127.0.0.1:9000", "Origin": "http://127.0.0.1:9000"}) as response:
+            self.assertEqual(response.status, 200)
+
     def test_origin_host_and_write_rejection(self):
         for headers in [{"Host": "attacker.example"},
                         {"Origin": "https://attacker.example"},

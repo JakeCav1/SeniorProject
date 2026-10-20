@@ -192,8 +192,7 @@ class DashboardServer(ThreadingHTTPServer):
         self.snapshot = snapshot
         self.asset_dir = Path(asset_dir or Path(__file__).parent / "web")
         super().__init__(address, Handler)
-        port = self.server_address[1]
-        self.authorities = {"127.0.0.1:" + str(port), "localhost:" + str(port)}
+        self.allowed_hosts = {"127.0.0.1", "localhost"}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -224,7 +223,11 @@ class Handler(BaseHTTPRequestHandler):
         # Loopback plus Host/Origin checks prevent DNS rebinding and cross-site reads.
         authority = self.headers.get("Host", "").lower()
         origin = self.headers.get("Origin")
-        if (authority not in self.server.authorities or
+        host, separator, port = authority.rpartition(":")
+        trusted_host = (separator and host in self.server.allowed_hosts and port.isdecimal()
+                        and 1 <= int(port) <= 65535)
+        # An SSH tunnel may use a different local port from the VM listening port.
+        if (not trusted_host or
             (origin is not None and origin != "http://" + authority) or
                 self.headers.get("Sec-Fetch-Site") == "cross-site"):
             self.send_body(403, b"Forbidden", "text/plain")
