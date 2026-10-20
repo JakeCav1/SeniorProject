@@ -150,3 +150,7 @@ This release supports only Linux systemd journals for live collection. Windows a
 Use the same custom rules and checkpoint directory as the monitor. Invalid state or changed rules returns status 2. A missing snapshot is reported as `saved_progress: false`, which can also mean a running collector has not received its first record. `active_groups` and `last_event_timestamp` reflect persisted event-time correlation, not wall-clock freshness; stateless-only rules may have no correlation timestamp. Pending counts describe committed alerts awaiting output acknowledgement. Raw event payloads and journal cursors are omitted.
 
 Unlike live collection, status works on all supported platforms and in the interactive Chomp prompt. On Windows, its default directory is `%LOCALAPPDATA%/ChompEDR/state/chomp-edr/ssh`; use `--checkpoint DIRECTORY` to inspect exported/copied state elsewhere. Status does not test whether the saved cursor is still retained by the Linux journal.
+
+### Terminal alert highlighting
+
+When `chompedr monitor` writes to a terminal, each alert starts with a bold red `ALERT` line above the JSON details. Redirecting or piping stdout keeps plain JSON Lines without headings or color codes. Restart the monitor after updating the executable to use this display.

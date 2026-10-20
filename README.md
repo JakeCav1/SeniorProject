@@ -4,7 +4,7 @@ A lightweight Rust endpoint detection and response project for UNIX systems and 
 
 ## Project progress
 
-Last updated: **2026-10-19**. Current phase: **Linux SSH, process, and selected-file monitoring**. Completed items below describe the current implementation, not a production-ready EDR.
+Last updated: **2026-10-20**. Current phase: **Linux SSH, process, and selected-file monitoring**. Completed items below describe the current implementation, not a production-ready EDR.
 
 ### Completed
 
@@ -28,7 +28,7 @@ Last updated: **2026-10-19**. Current phase: **Linux SSH, process, and selected-
 | Check | Latest result | Evidence / remaining work |
 | --- | --- | --- |
 | Windows build | Passed locally | Rust stable 1.98.1 |
-| Automated tests | 64 passed locally on Windows; current changes awaiting Linux/macOS CI | 11 engine, 17 CLI, 8 SSH/correlation, 5 journal, and 3 scenario suites (30 scenario/input combinations), 11 checkpoint/status tests, and platform-specific monitor/process tests |
+| Automated tests | 66 passed locally on Windows; current changes awaiting Linux/macOS CI | 11 engine, 17 CLI, 8 SSH/correlation, 5 journal, and 3 scenario suites (30 scenario/input combinations), 11 checkpoint/status tests, and platform-specific monitor/process tests |
 | Formatting | Passed locally | `cargo fmt --all -- --check` |
 | Lint | Passed locally | `cargo clippy --locked --all-targets -- -D warnings` |
 | Sample scan | Passed locally | Three events produce two alerts |
@@ -74,6 +74,8 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 
 | Date | Update | Validation |
 | --- | --- | --- |
+| 2026-10-20 | Added recursive directory selection to watch-files, including new/removed subtrees, overlapping-root deduplication, and bounded traversal | Windows tests and lint passed; live recursive Linux checks pending CI |
+| 2026-10-20 | Added a bold red ALERT heading above live SSH alerts displayed in a terminal; redirected output remains JSON Lines | 66 Windows tests and lint passed, including chunked alert formatting and unchanged redirected JSON |
 | 2026-10-19 | Changed validate to list supplied rule metadata; list-rules inventories internal YAML files; added positional rule paths; removed standalone SSH normalization | 64 Windows tests, formatting, lint, and release build passed; Linux/macOS CI pending |
 | 2026-09-17 | Implemented the initial rule engine, CLI, starter rules, sample events, documentation, and CI configuration | Windows build, all 12 tests, formatting, lint, and sample scan passed |
 | 2026-09-17 | Added this progress tracker with milestone status and remaining work | Documentation checked against the current implementation and recorded test results |

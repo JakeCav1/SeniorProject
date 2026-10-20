@@ -2,7 +2,7 @@ use chomp_edr::Engine;
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use std::collections::HashSet;
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, Read, Write};
+use std::io::{self, BufRead, BufReader, IsTerminal, Read, Write};
 use std::path::PathBuf;
 
 const MAX_BYTES: usize = 1024 * 1024;
@@ -20,9 +20,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Watch selected Linux file paths for metadata changes without reading contents.
+    /// Watch Linux files or recursive directories for metadata changes without reading contents.
     WatchFiles {
-        /// Absolute file path; repeat to select up to 64 paths. Not recursive.
+        /// Absolute file or directory path; directories are recursive. Repeat for up to 64 roots.
         #[arg(long = "path", required = true)]
         paths: Vec<PathBuf>,
         #[arg(long, default_value_t = 1000, value_parser = clap::value_parser!(u64).range(100..=60000))]
@@ -325,7 +325,9 @@ fn run(cli: Cli) -> Result<u8, Box<dyn std::error::Error>> {
                 serde_json::to_writer(&mut out, &state)?;
                 writeln!(out)?;
             } else {
-                chomp_edr::monitor::run(engine, checkpoint, once, &mut out)
+                let output =
+                    chomp_edr::terminal::AlertOutput::new(&mut out, io::stdout().is_terminal());
+                chomp_edr::monitor::run(engine, checkpoint, once, output)
                     .map_err(|e| format!("monitor: {e}"))?;
             }
         }

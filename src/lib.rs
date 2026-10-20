@@ -9,6 +9,7 @@ pub mod monitor;
 pub mod processes;
 pub mod session;
 pub mod ssh;
+pub mod terminal;
 
 pub type Result<T> = std::result::Result<T, String>;
 

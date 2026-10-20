@@ -77,9 +77,79 @@ with tempfile.TemporaryDirectory(prefix="chomp-files-") as folder:
                 if watcher.poll() is None:
                     watcher.terminate()
                 watcher.wait(timeout=10)
-    for path in (str(folder), "relative", str(folder / ".." / "bad")):
+    for path in ("relative", str(folder / ".." / "bad")):
         result = subprocess.run([str(binary), "watch-files", "--path", path, "--samples", "1"],
             capture_output=True, text=True, timeout=10)
         if result.returncode != 2:
             raise RuntimeError("Invalid file selection accepted")
     print("PASS: creation, chmod, replacement, removal, symlink semantics, raw replay, and no repeated unchanged events")
+
+
+with tempfile.TemporaryDirectory(prefix="chomp-recursive-") as folder:
+    folder = Path(folder)
+    root = folder / "watched"
+    nested = root / "existing"
+    nested.mkdir(parents=True)
+    existing = nested / "original"
+    existing.write_text("baseline")
+    output_path = folder / "events"
+    diagnostics = folder / "diagnostics"
+    with output_path.open("w") as output, diagnostics.open("w") as errors:
+        watcher = subprocess.Popen([str(binary), "watch-files", "--path", str(root),
+            "--path", str(existing), "--interval-ms", "100", "--events"], stdout=output, stderr=errors)
+        try:
+            wait_for(lambda: "Baseline ready" in diagnostics.read_text(), "Missing recursive baseline")
+            def rows():
+                return [json.loads(line) for line in output_path.read_text().splitlines(keepends=True) if line.endswith("\n")]
+            def expect_recursive(count, path, action):
+                wait_for(lambda: len(rows()) >= count, f"Missing recursive {action}: {path}")
+                current = rows()
+                if len(current) != count or current[-1]["file"]["path"] != str(path) or current[-1]["event"]["action"] != action:
+                    raise RuntimeError(f"Unexpected recursive observations: {current}")
+            if rows():
+                raise RuntimeError("Baseline emitted alerts")
+            replacement = folder / "replacement"
+            replacement.write_text("updated baseline file")
+            os.replace(replacement, existing)
+            expect_recursive(1, existing, "changed")
+            # Publish a complete subtree between samples.
+            staged = folder / "staged"
+            (staged / "deeper").mkdir(parents=True)
+            (staged / "deeper" / "new").write_text("new file")
+            added = root / "added"
+            os.replace(staged, added)
+            new_file = added / "deeper" / "new"
+            expect_recursive(2, new_file, "created")
+            os.replace(added, folder / "removed-subtree")
+            expect_recursive(3, new_file, "removed")
+            loop = root / "loop"
+            loop.symlink_to(root, target_is_directory=True)
+            expect_recursive(4, loop, "created")
+            outside = folder / "outside"
+            outside.mkdir()
+            outside_file = outside / "private"
+            outside_file.write_text("before")
+            link = root / "external-link"
+            link.symlink_to(outside, target_is_directory=True)
+            expect_recursive(5, link, "created")
+            outside_file.write_text("after with a different size")
+            os.mkfifo(root / "pipe")
+            time.sleep(0.4)
+            if len(rows()) != 5 or watcher.poll() is not None:
+                raise RuntimeError("Symlink traversal, duplicate events, or special-file blocking")
+            replay = subprocess.run([str(binary), "scan", str(repo / "rules/file-watch.yaml")],
+                input=output_path.read_text(), capture_output=True, text=True, check=True, timeout=10)
+            if len(replay.stdout.splitlines()) != 5:
+                raise RuntimeError("Recursive observations failed replay")
+            # The CI watcher runs as an ordinary user: unreadable subdirectories
+            # must stop the scan, not masquerade as mass file removals.
+            nested.chmod(0o000)
+            wait_for(lambda: watcher.poll() is not None, "Unreadable directory did not stop monitoring")
+            if watcher.returncode != 2 or len(rows()) != 5:
+                raise RuntimeError("Partial recursive snapshot emitted misleading removals")
+        finally:
+            nested.chmod(0o700)
+            if watcher.poll() is None:
+                watcher.terminate()
+            watcher.wait(timeout=10)
+    print("PASS: recursive baseline, overlapping roots, nested changes, subtree creation/removal, symlink loops, special files, and permission errors")
