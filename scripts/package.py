@@ -87,7 +87,7 @@ Linux install (Python 3 required): python3 scripts/install-linux.py --binary ./c
 Live SSH collection is Linux-only. See docs/linux-install.md and docs/ssh-demo.md.
 Linux dashboard: install the system collector binary first, then python3 scripts/install-dashboard-linux.py with sudo.
 See docs/dashboard.md for service activation and SSH-tunnel access.
-macOS and Windows can scan exported files and use the interactive prompt.
+macOS and Windows can scan exported files. Running without arguments prints help and exits.
 See docs/downloads.md for compatibility, checksums, and download instructions.
 """
         (package / "START-HERE.txt").write_text(quickstart, encoding="utf-8")
