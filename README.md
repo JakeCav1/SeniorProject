@@ -4,7 +4,7 @@ A lightweight Rust endpoint detection and response project for UNIX systems and 
 
 ## Project progress
 
-Last updated: **2026-10-18**. Current phase: **Linux SSH, process, and selected-file monitoring**. Completed items below describe the current implementation, not a production-ready EDR.
+Last updated: **2026-10-19**. Current phase: **Linux SSH, process, and selected-file monitoring**. Completed items below describe the current implementation, not a production-ready EDR.
 
 ### Completed
 
@@ -28,12 +28,12 @@ Last updated: **2026-10-18**. Current phase: **Linux SSH, process, and selected-
 | Check | Latest result | Evidence / remaining work |
 | --- | --- | --- |
 | Windows build | Passed locally | Rust stable 1.98.1 |
-| Automated tests | 60 passed on Linux; 59 on Windows and macOS | 11 engine, 14 CLI, 9 SSH/correlation, 5 journal, and 3 scenario suites (30 scenario/input combinations), 11 checkpoint/status tests, and platform-specific monitor/process tests |
+| Automated tests | 64 passed locally on Windows; current changes awaiting Linux/macOS CI | 11 engine, 17 CLI, 8 SSH/correlation, 5 journal, and 3 scenario suites (30 scenario/input combinations), 11 checkpoint/status tests, and platform-specific monitor/process tests |
 | Formatting | Passed locally | `cargo fmt --all -- --check` |
 | Lint | Passed locally | `cargo clippy --locked --all-targets -- -D warnings` |
 | Sample scan | Passed locally | Three events produce two alerts |
 | Linux and macOS | Passed current branch CI | Formatting, lint, and platform-specific suites passed |
-| GitHub CI | All three platforms passed | [Verified run for 552bccd](https://github.com/rmart1368/SeniorProject/actions/runs/39140309074) |
+| GitHub CI | Previous revision passed; CLI revision pending | [Verified run for 552bccd](https://github.com/rmart1368/SeniorProject/actions/runs/39140309074) |
 | Downloadable packages | All three native packages passed | Extracted executable demo and manifest hashes verified before upload |
 | Real Linux process integration | Passed on Ubuntu CI | Newly launched process alerted once; raw observations and scan replay verified |
 | Linux installer | 5 tests passed | User installation, unit validation, upgrades, path handling, and symlink refusal |
@@ -74,6 +74,7 @@ Later backlog from the pitch: host-client orchestration and CLI rule editing (Da
 
 | Date | Update | Validation |
 | --- | --- | --- |
+| 2026-10-19 | Changed validate to list supplied rule metadata; list-rules inventories internal YAML files; added positional rule paths; removed standalone SSH normalization | 64 Windows tests, formatting, lint, and release build passed; Linux/macOS CI pending |
 | 2026-09-17 | Implemented the initial rule engine, CLI, starter rules, sample events, documentation, and CI configuration | Windows build, all 12 tests, formatting, lint, and sample scan passed |
 | 2026-09-17 | Added this progress tracker with milestone status and remaining work | Documentation checked against the current implementation and recorded test results |
 | 2026-09-22 | Verified the initial GitHub CI run succeeded | Linux, macOS, and Windows matrix passed |
@@ -142,7 +143,7 @@ Status reports checkpoint use, saved progress, queued alerts, and the last corre
 
 ## Linux journal support
 
-Use `scan --input-format journal` or `normalize-ssh --input-format journal` with JSON Lines from `journalctl`. The [SSH walkthrough](docs/ssh-demo.md) includes the live pipeline command and the isolated Linux integration test. The journal adapter uses process metadata to identify SSH records; automatic service installation remains out of scope.
+Use `scan --input-format journal` with JSON Lines from `journalctl`. The [SSH walkthrough](docs/ssh-demo.md) includes the live pipeline command and the isolated Linux integration test. The journal adapter uses process metadata to identify SSH records; automatic service installation remains out of scope.
 
 ## SSH detection
 
@@ -159,7 +160,7 @@ chompedr
 chompedr scan -r rules -i examples/events.jsonl -f text
 ```
 
-Inside the prompt, try `validate -r rules`, `list-rules -r rules`, or `scan -r rules -i examples/events.jsonl -f text`. `help` lists commands. Commands run one at a time and rules reload on each command. Failed commands report errors without closing the session. Quote paths containing spaces with single or double quotes; backslashes remain literal. Shell operators, variable expansion, and command execution are not supported. Interactive scans require `-i FILE`, because the prompt owns stdin; use the existing one-line scan command from the system shell for piped events. Each command line is limited to 8 KiB; exceeding that limit ends the session with an error.
+Inside the prompt, try `validate -r rules`, `list-rules`, or `scan -r rules -i examples/events.jsonl -f text`. `help` lists commands. Commands run one at a time and rules reload on each command. Failed commands report errors without closing the session. Quote paths containing spaces with single or double quotes; backslashes remain literal. Shell operators, variable expansion, and command execution are not supported. Interactive scans require `-i FILE`, because the prompt owns stdin; use the existing one-line scan command from the system shell for piped events. Each command line is limited to 8 KiB; exceeding that limit ends the session with an error.
 
 The banner appears only when no arguments are supplied. Scans, JSON output, `--help`, and `--version` remain free of the banner. Rule and event paths are relative to the current directory; the startup screen works from any directory.
 
@@ -193,18 +194,18 @@ For the local Windows demo, the release executable can also be installed in `%LO
 
 ## CLI contract
 
-- `validate -r PATH [-r PATH ...]`: validate all rule sources, including disabled rules and regex patterns.
-- `list-rules -r PATH [-r PATH ...] [-f text|json]`: list rule metadata; text is the default. JSON emits one object per rule with `id`, `name`, `description`, `severity`, and `enabled`.
+- `validate PATH [PATH ...] [-f text|json]`: validate supplied rules and list their ID, name, description (JSON), severity, and enabled status. `-r` / `--rules` remains an optional alternative.
+- `list-rules [-f text|json]`: list all rules grouped by internal `.yaml` file with enabled/disabled status. Reads the `rules` directory beside the executable when present; otherwise uses all `.yaml` files bundled from the project rules directory at build time. Independent of the current working directory. JSON includes `file`, `id`, `name`, and `enabled`.
 - `scan -r PATH [-r PATH ...] [--rule ID ...] [-i FILE|-] [-f json|text] [--fail-on-alert]`: stream JSON Lines from a file or stdin (the default).
 - `--help` and `--version` are available. No administrator permissions required.
 
-Each `-r` accepts one file or a directory. Directories load immediate regular `.yaml`/`.yml` files, case-insensitively by extension, in sorted path order; nested directories and symlink entries are ignored. Explicit file arguments may use any extension. Sources are processed in argument order, and repeated canonical file paths are loaded once. Empty rule directories, invalid files, and duplicate rule IDs across different files are errors. All loaded rules are validated before selection or event processing.
+Rule files/directories can be positional for `validate`, `scan`, `monitor`, `watch-processes`, and `watch-files`; `-r` / `--rules` remains supported. `validate` and `scan` still require at least one source. Each `-r` accepts one file or a directory. Directories load immediate regular `.yaml`/`.yml` files, case-insensitively by extension, in sorted path order; nested directories and symlink entries are ignored. Explicit file arguments may use any extension. Flagged sources are processed first, followed by positional sources, and repeated canonical file paths are loaded once. Empty rule directories, invalid files, and duplicate rule IDs across different files are errors. All loaded rules are validated before selection or event processing.
 
 Repeat `--rule ID` to scan only those exact IDs. Unknown IDs are errors; repeated IDs do not duplicate alerts, and disabled rules stay disabled. Without `--rule`, all enabled rules are used. Selection preserves source order.
 
 ```sh
 chomp validate -r rules
-chomp list-rules -r rules --format json
+chomp list-rules --format json
 chomp scan -r rules --rule CHOMP-002 -i examples/events.jsonl --fail-on-alert
 # Load your own additional file alongside the starter rules:
 chomp scan -r rules -r /path/to/custom.yaml -i examples/events.jsonl

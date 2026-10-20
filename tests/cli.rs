@@ -19,11 +19,11 @@ fn session(commands: &str) -> Output {
 
 #[test]
 fn interactive_session_runs_multiple_commands_and_exits() {
-    let output = session("help\nvalidate -r rules\nlist-rules -r rules\nscan -r rules -i examples/events.jsonl -f text --fail-on-alert\nexit\ninvalid-after-exit\n");
+    let output = session("help\nvalidate -r rules\nlist-rules\nscan -r rules -i examples/events.jsonl -f text --fail-on-alert\nexit\ninvalid-after-exit\n");
     assert!(output.status.success());
     assert!(output.stderr.is_empty());
     let text = String::from_utf8(output.stdout).unwrap();
-    assert!(text.contains("Valid: 7 rule(s)"));
+    assert!(text.contains("CHOMP-FILE-001"));
     assert!(text.contains("Sensitive account file modified"));
     assert!(text.contains("status 1"));
     assert!(text.contains("Goodbye."));
@@ -40,7 +40,7 @@ fn interactive_session_recovers_from_invalid_commands_and_stdin_scans() {
     assert!(errors.contains("unclosed quote"));
     assert!(String::from_utf8(output.stdout)
         .unwrap()
-        .contains("Valid: 7 rule(s)"));
+        .contains("CHOMP-FILE-001"));
 }
 
 #[test]
@@ -57,7 +57,7 @@ fn interactive_session_supports_quoted_paths_and_eof() {
     assert_eq!(
         String::from_utf8(output.stdout)
             .unwrap()
-            .matches("Valid: 1 rule(s)")
+            .matches("\"quoted\"")
             .count(),
         2
     );
@@ -182,7 +182,7 @@ fn help_version_validation_and_listing() {
         vec!["--help"],
         vec!["--version"],
         vec!["validate", "-r", "rules/starter.yaml"],
-        vec!["list-rules", "-r", "rules/starter.yaml"],
+        vec!["list-rules"],
     ] {
         let output = Command::new(env!("CARGO_BIN_EXE_chomp"))
             .args(args)
@@ -254,7 +254,7 @@ fn folder_listing_is_sorted_and_machine_readable() {
     std::fs::create_dir(fixture.0.join("nested")).unwrap();
     fixture.write("nested/ignored.yaml", "invalid");
     let output = fixture
-        .command("list-rules")
+        .command("validate")
         .args(["--format", "json"])
         .output()
         .unwrap();
@@ -282,10 +282,7 @@ fn repeated_sources_deduplicate_paths_but_reject_duplicate_ids() {
         .output()
         .unwrap();
     assert!(output.status.success());
-    assert_eq!(
-        String::from_utf8(output.stdout).unwrap().trim(),
-        "Valid: 1 rule(s)"
-    );
+    assert_eq!(String::from_utf8(output.stdout).unwrap().lines().count(), 1);
     fixture.write("two.yaml", &simple_rule("one"));
     let output = fixture.command("validate").output().unwrap();
     assert_eq!(output.status.code(), Some(2));
@@ -334,4 +331,94 @@ fn selected_rules_control_alerts_and_exit_status() {
     assert!(String::from_utf8(output.stderr)
         .unwrap()
         .contains("unknown rule id"));
+}
+
+#[test]
+fn positional_rules_and_removed_normalizer() {
+    for args in [
+        vec!["validate", "rules/ssh.yaml", "-f", "json"],
+        vec![
+            "scan",
+            "rules/ssh.yaml",
+            "--input-format",
+            "ssh",
+            "-i",
+            "examples/ssh-demo.log",
+        ],
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_chompedr"))
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{:?}", output);
+        assert_eq!(String::from_utf8(output.stdout).unwrap().lines().count(), 2);
+    }
+    for args in [
+        vec!["normalize-ssh"],
+        vec!["validate"],
+        vec!["scan"],
+        vec!["list-rules", "rules/ssh.yaml"],
+    ] {
+        assert_eq!(
+            Command::new(env!("CARGO_BIN_EXE_chompedr"))
+                .args(args)
+                .output()
+                .unwrap()
+                .status
+                .code(),
+            Some(2)
+        );
+    }
+}
+
+#[test]
+fn internal_listing_is_independent_of_working_directory() {
+    let fixture = Fixture::new();
+    fixture.write("unrelated.yaml", "broken: [");
+    let output = Command::new(env!("CARGO_BIN_EXE_chompedr"))
+        .current_dir(&fixture.0)
+        .args(["list-rules", "-f", "json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let rows: Vec<serde_json::Value> = String::from_utf8(output.stdout)
+        .unwrap()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    assert_eq!(rows.len(), 7);
+    assert!(rows
+        .iter()
+        .all(|r| r["enabled"].is_boolean() && r["file"].as_str().unwrap().ends_with(".yaml")));
+}
+
+#[test]
+fn installed_listing_reads_every_yaml_and_disabled_rules() {
+    let fixture = Fixture::new();
+    let binary = fixture.0.join(if cfg!(windows) {
+        "chompedr.exe"
+    } else {
+        "chompedr"
+    });
+    std::fs::copy(env!("CARGO_BIN_EXE_chompedr"), &binary).unwrap();
+    std::fs::create_dir(fixture.0.join("rules")).unwrap();
+    fixture.write("rules/a.yaml", &simple_rule("enabled"));
+    fixture.write(
+        "rules/b.yaml",
+        &simple_rule("disabled").replace("  name: Demo", "  enabled: false\n  name: Demo"),
+    );
+    fixture.write("rules/ignore.txt", "invalid");
+    let output = Command::new(&binary)
+        .current_dir(std::env::temp_dir())
+        .arg("list-rules")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    assert!(text.contains("a.yaml") && text.contains("b.yaml"));
+    assert!(text.contains("\"disabled\"\tdisabled"));
+    fixture.write("rules/c.yaml", "broken: [");
+    let output = Command::new(binary).arg("list-rules").output().unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
 }

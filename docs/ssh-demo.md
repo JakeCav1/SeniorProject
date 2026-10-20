@@ -10,15 +10,6 @@ chompedr scan -r rules/ssh.yaml -i examples/ssh-demo.log --input-format ssh -f t
 
 Inside the interactive `chompedr>` prompt, omit the executable name. Expected alerts: one `CHOMP-SSH-001` alert on the fifth failure from `198.51.100.20`, and one `CHOMP-SSH-002` alert for a root login. The example uses documentation IP addresses and synthetic records, not captured production activity. One unrelated PAM line is skipped and counted on stderr. `--fail-on-alert` returns code 1 when alerts occur; errors return code 2.
 
-Normalization is also available independently:
-
-```sh
-chompedr normalize-ssh -i examples/ssh-demo.log > events.jsonl
-chompedr scan -r rules/ssh.yaml -i events.jsonl
-```
-
-In PowerShell versions that redirect native output as UTF-16, use direct `--input-format ssh` scanning or explicitly save normalized output as UTF-8 without a BOM.
-
 ## Linux input
 
 Supported input is an OpenSSH log record with an explicit ISO date, numeric UTC offset (or `Z`), hostname, and `sshd[pid]` or `sshd-session[pid]` prefix:
@@ -53,12 +44,6 @@ journalctl --no-pager -o json -n 0 -f _COMM=sshd _COMM=sshd-session _COMM=sshd-a
 ```
 
 Repeated matches on the same journal field are alternatives. `-n 0 -f` starts with new records; remove those options and add an appropriate `--since` value for historical scanning. Run from the project folder or provide an absolute rule path. Chomp flushes alerts as it processes events. Stop the system-shell pipeline with Ctrl+C. This is an external journal pipeline, not a background service installed by Chomp. System clock corrections or combined logs can still cause the documented out-of-order timestamp error.
-
-To inspect normalized journal events separately:
-
-```sh
-journalctl --no-pager -o json _COMM=sshd _COMM=sshd-session _COMM=sshd-auth | chompedr normalize-ssh --input-format journal
-```
 
 Use JSON Lines (`-o json`), not `json-pretty` or `json-seq`. Do not pass unfiltered arbitrary binary journal records as normalized event input.
 

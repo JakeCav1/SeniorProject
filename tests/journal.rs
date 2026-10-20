@@ -86,7 +86,7 @@ fn run(args: &[&str], input: &str) -> std::process::Output {
 }
 
 #[test]
-fn journal_stdin_scan_and_normalization_agree() {
+fn journal_stdin_scan_groups_failures() {
     let mut input = String::new();
     for n in 0..6 {
         let mut r = record();
@@ -105,12 +105,4 @@ fn journal_stdin_scan_and_normalization_agree() {
             .count(),
         1
     );
-    let normal = run(&["normalize-ssh", "--input-format", "journal"], &input);
-    assert!(normal.status.success());
-    let scan = run(
-        &["scan", "-r", "rules/ssh.yaml"],
-        &String::from_utf8(normal.stdout).unwrap(),
-    );
-    assert!(scan.status.success());
-    assert_eq!(scan.stdout, direct.stdout);
 }
